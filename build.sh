@@ -1,4 +1,4 @@
-cd ./contracts/ddxf
+cd ./contracts/dtoken
 
 cargo build --release --target=wasm32-unknown-unknown
 

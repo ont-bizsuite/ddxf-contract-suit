@@ -18,19 +18,22 @@ const KEY_SELLER_ITEM_SOLD: &[u8] = b"02";
 
 #[derive(Clone)]
 struct ResourceDDO {
-    resource_type: RT,                        //0:RTStaticFile,
-    manager: Address,                         // data owner id
-    endpoint: String,                         // data service provider uri
-    token_endpoint: BTreeMap<String, String>, // endpoint for tokens
-    desc_hash: Option<H256>,                  // required if len(Templates) > 1
+    resource_type: RT,                         //0:RTStaticFile,
+    token_resource_type: BTreeMap<String, RT>, // RT for tokens
+    manager: Address,                          // data owner id
+    endpoint: String,                          // data service provider uri
+    token_endpoint: BTreeMap<String, String>,  // endpoint for tokens
+    desc_hash: Option<H256>,                   // required if len(Templates) > 1
 }
 
 impl<'a> Encoder for ResourceDDO {
     fn encode(&self, sink: &mut Sink) {
-        match self.resource_type {
-            RT::RTStaticFile => {
-                sink.write(0u8);
-            }
+        sink.write(self.resource_type.clone());
+        let l = self.token_resource_type.len() as u32;
+        sink.write(l);
+        for (k, v) in self.token_resource_type.iter() {
+            sink.write(k);
+            sink.write(v);
         }
         sink.write(&self.manager);
         sink.write(&self.endpoint);
@@ -47,7 +50,13 @@ impl<'a> Encoder for ResourceDDO {
 
 impl<'a> Decoder<'a> for ResourceDDO {
     fn decode(source: &mut Source<'a>) -> Result<Self, Error> {
-        let rt: u8 = source.read().unwrap();
+        let resource_type = source.read()?;
+        let l: u32 = source.read()?;
+        let mut token_resource_type: BTreeMap<String, RT> = BTreeMap::new();
+        for _ in 0..l {
+            let (k, v) = source.read()?;
+            token_resource_type.insert(k, v);
+        }
         let manager: Address = source.read().unwrap();
         let endpoint: String = source.read().unwrap();
         let l: u32 = source.read().unwrap();
@@ -57,13 +66,10 @@ impl<'a> Decoder<'a> for ResourceDDO {
             let v: String = source.read().unwrap();
             bmap.insert(k, v);
         }
-        let resource_type = RT::RTStaticFile;
-        if rt != 0 {
-            panic!("");
-        }
         let desc_hash = source.read().ok();
         Ok(ResourceDDO {
             resource_type,
+            token_resource_type,
             manager,
             endpoint,
             token_endpoint: bmap,
@@ -75,6 +81,26 @@ impl<'a> Decoder<'a> for ResourceDDO {
 #[derive(Clone)]
 enum RT {
     RTStaticFile,
+}
+
+impl Encoder for RT {
+    fn encode(&self, sink: &mut Sink) {
+        match self {
+            RT::RTStaticFile => {
+                sink.write(0u8);
+            }
+        }
+    }
+}
+
+impl<'a> Decoder<'a> for RT {
+    fn decode(source: &mut Source<'a>) -> Result<Self, Error> {
+        let u = source.read_byte()?;
+        match u {
+            0 => Ok(RT::RTStaticFile),
+            _ => panic!(""),
+        }
+    }
 }
 
 #[derive(Encoder, Decoder, Clone)]
@@ -184,13 +210,18 @@ fn dtoken_seller_publish(resource_id: &str, resource_ddo: &ResourceDDO, item: &D
         }
     }
     assert_ne!(item.templates.len(), 0);
-    match resource_ddo.resource_type {
-        RT::RTStaticFile => {
-            for (token_hash, _) in item.templates.iter() {
+    for (token_hash, _) in item.templates.iter() {
+        let rt = resource_ddo
+            .token_resource_type
+            .get(token_hash)
+            .unwrap_or(&resource_ddo.resource_type);
+        match rt {
+            RT::RTStaticFile => {
                 assert_eq!(token_hash.len() as u32, SHA256_SIZE + CRC32_SIZE);
             }
         }
     }
+
     if item.templates.len() > 1 {
         assert!(resource_ddo.desc_hash.is_some())
     }
