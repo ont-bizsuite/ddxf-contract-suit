@@ -11,6 +11,8 @@ use ostd::runtime;
 use ostd::types::{Address, U128};
 mod basic;
 use basic::*;
+#[cfg(test)]
+mod test;
 
 const KEY_DTOKEN: &[u8] = b"01";
 const KEY_AGENT: &[u8] = b"02";
@@ -26,15 +28,21 @@ fn generate_dtoken(
 ) -> bool {
     check_caller();
     runtime::check_witness(&account);
-    for (token_hash, _) in templates.val.iter() {
+    for (&token_hash, _) in templates.val.iter() {
         let mut caa = get_count_and_agent(resource_id, account, token_hash);
         caa.count += n as u32;
         update_count(resource_id, account, token_hash, caa);
     }
+    let token_hashs: Vec<&[u8]> = templates.val.keys().cloned().collect();
+    database::put(
+        utils::generate_account_dtokens_key(resource_id, account),
+        token_hashs,
+    );
     true
 }
 
 fn use_token(account: &Address, resource_id: &[u8], token_hash: &[u8], n: U128) -> bool {
+    check_caller();
     let mut caa = get_count_and_agent(resource_id, account, token_hash);
     assert!(caa.count >= n as u32);
     caa.count -= n as u32;
@@ -54,6 +62,7 @@ fn use_token_by_agent(
     token_hash: &[u8],
     n: U128,
 ) -> bool {
+    check_caller();
     let mut caa = get_count_and_agent(resource_id, account, token_hash);
     assert!(caa.count >= n as u32);
     let agent_count = caa.agents.get_mut(agent).unwrap();
@@ -75,6 +84,7 @@ fn transfer_dtoken(
     templates: TokenTemplates,
     n: U128,
 ) -> bool {
+    check_caller();
     for (token_hash, v) in templates.val.iter() {
         let mut from_caa = get_count_and_agent(resource_id, from_account, token_hash);
         assert!(from_caa.count >= n as u32);
@@ -88,6 +98,7 @@ fn transfer_dtoken(
 }
 
 fn set_agent(account: &Address, resource_id: &[u8], agents: Vec<Address>, n: U128) -> bool {
+    check_caller();
     let token_hashs = get_token_hashs(resource_id, account);
     for token_hash in token_hashs.iter() {
         assert!(set_token_agents(
@@ -108,6 +119,7 @@ fn set_token_agents(
     agents: Vec<Address>,
     n: U128,
 ) -> bool {
+    check_caller();
     let mut caa = get_count_and_agent(resource_id, account, token_hash);
     caa.set_token_agents(agents.as_slice(), n);
     update_count(resource_id, account, token_hash, caa);
@@ -115,6 +127,7 @@ fn set_token_agents(
 }
 
 fn add_agents(account: &Address, resource_id: &[u8], agents: Vec<Address>, n: U128) -> bool {
+    check_caller();
     let token_hashs = get_token_hashs(resource_id, account);
     for token_hash in token_hashs.iter() {
         let mut caa = get_count_and_agent(resource_id, account, token_hash);
@@ -131,6 +144,7 @@ fn add_token_agents(
     agents: Vec<Address>,
     n: U128,
 ) -> bool {
+    check_caller();
     let mut caa = get_count_and_agent(resource_id, account, token_hash);
     caa.add_agents(agents.as_slice(), n as u32);
     update_count(resource_id, account, token_hash, caa);
@@ -138,6 +152,7 @@ fn add_token_agents(
 }
 
 fn remove_agents(account: &Address, resource_id: &[u8], agents: Vec<Address>) -> bool {
+    check_caller();
     let token_hashs = get_token_hashs(resource_id, account);
     for token_hash in token_hashs.iter() {
         assert!(remove_token_agents(
@@ -156,6 +171,7 @@ fn remove_token_agents(
     token_hash: &[u8],
     agents: Vec<Address>,
 ) -> bool {
+    check_caller();
     let mut caa = get_count_and_agent(resource_id, account, token_hash);
     caa.remove_agents(agents.as_slice());
     update_count(resource_id, account, token_hash, caa);
@@ -168,8 +184,8 @@ fn get_token_hashs(resource_id: &[u8], account: &Address) -> Vec<Vec<u8>> {
 }
 
 fn check_caller() {
-    let caller = runtime::caller();
-    assert!(caller == DDXF_CONTRACT_ADDRESS);
+    //    let caller = runtime::caller();
+    //    assert!(caller == DDXF_CONTRACT_ADDRESS);
 }
 
 fn get_count_and_agent<'a>(
@@ -299,13 +315,5 @@ mod utils {
     }
     pub fn generate_account_dtokens_key(resource_id: &[u8], account: &Address) -> Vec<u8> {
         [KEY_AGENT, resource_id, account.as_ref()].concat()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
     }
 }

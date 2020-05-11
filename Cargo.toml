@@ -1,7 +1,8 @@
 [workspace]
 members = [
     "contracts/ddxf",
-    "contracts/dtoken"
+    "contracts/dtoken",
+    "contracts/marketplace"
 ]
 
 [profile.release]

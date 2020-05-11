@@ -3,10 +3,18 @@ use super::ostd::abi::{Decoder, Encoder, Error, Sink, Source};
 use super::ostd::types::{Address, U128};
 use super::BTreeMap;
 
+#[derive(Clone)]
 pub struct TokenTemplates<'a> {
     pub val: BTreeMap<&'a [u8], bool>,
 }
 
+impl<'a> TokenTemplates<'a> {
+    pub fn new(token_hash: &'a [u8]) -> Self {
+        let mut val: BTreeMap<&[u8], bool> = BTreeMap::new();
+        val.insert(token_hash, true);
+        TokenTemplates { val }
+    }
+}
 impl<'a> Encoder for TokenTemplates<'a> {
     fn encode(&self, sink: &mut Sink) {
         let l = self.val.len() as u32;
