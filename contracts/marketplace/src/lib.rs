@@ -10,7 +10,7 @@ use ostd::prelude::*;
 use ostd::runtime::{address, check_witness, input, ret};
 use ostd::types::{Address, U128};
 mod utils;
-use ostd::contract::{ong, ont};
+use ostd::contract::{neo, ong, ont};
 use utils::*;
 mod basic;
 use basic::*;
@@ -120,7 +120,7 @@ fn transfer(
         TokenType::OEP4 => {
             //TODO
             let contract_address = contract_addr.unwrap();
-            assert!(ont::transfer(from, to, amt));
+            let res = neo::call_contract(&contract_address, ("transfer", (from, to, amt))).unwrap();
         }
     }
     true
@@ -145,7 +145,7 @@ pub fn invoke() {
             let seller_acc = source.read().unwrap();
             sink.write(get_fee_split_model(seller_acc));
         }
-        b"transfer_amount" => {
+        b"transferAmount" => {
             let (buyer_acc, seller_acc, fee, n) = source.read().unwrap();
             sink.write(transfer_amount(buyer_acc, seller_acc, fee, n));
         }

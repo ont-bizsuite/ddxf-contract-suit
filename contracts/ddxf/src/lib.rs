@@ -9,8 +9,14 @@ use ostd::prelude::H256;
 use ostd::prelude::*;
 use ostd::runtime;
 use ostd::types::{Address, U128};
-pub mod basic;
+mod basic;
 use basic::*;
+mod dtoken;
+use dtoken::*;
+use ostd::contract::{neo, ong, ont};
+
+#[cfg(test)]
+mod test;
 
 const SHA256_SIZE: u32 = 32;
 const CRC32_SIZE: u32 = 4;
@@ -18,7 +24,11 @@ const CRC32_SIZE: u32 = 4;
 const KEY_SELLER_ITEM_INFO: &[u8] = b"01";
 const KEY_SELLER_ITEM_SOLD: &[u8] = b"02";
 
-fn dtoken_seller_publish(resource_id: &str, resource_ddo: &ResourceDDO, item: &DTokenItem) -> bool {
+fn dtoken_seller_publish(
+    resource_id: &[u8],
+    resource_ddo: &ResourceDDO,
+    item: &DTokenItem,
+) -> bool {
     assert!(runtime::check_witness(&resource_ddo.manager));
     let resource =
         database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id));
@@ -56,7 +66,7 @@ fn dtoken_seller_publish(resource_id: &str, resource_ddo: &ResourceDDO, item: &D
 }
 
 fn buy_dtoken_from_reseller(
-    resource_id: &str,
+    resource_id: &[u8],
     n: U128,
     buyer_account: &Address,
     reseller_account: &Address,
@@ -66,12 +76,15 @@ fn buy_dtoken_from_reseller(
         database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
             .unwrap();
     assert!(transfer_fee(
+        &item_info.resource_ddo.dtoken_contract_address,
         buyer_account,
         reseller_account,
+        None,
         &item_info.item.fee,
         n
     ));
     assert!(transfer_dtoken(
+        &item_info.resource_ddo.dtoken_contract_address,
         reseller_account,
         buyer_account,
         resource_id,
@@ -81,7 +94,7 @@ fn buy_dtoken_from_reseller(
     true
 }
 
-fn buy_dtoken(resource_id: &str, n: U128, buyer_account: &Address) -> bool {
+fn buy_dtoken(resource_id: &[u8], n: U128, buyer_account: &Address) -> bool {
     assert!(runtime::check_witness(buyer_account));
     let item_info =
         database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
@@ -91,15 +104,18 @@ fn buy_dtoken(resource_id: &str, n: U128, buyer_account: &Address) -> bool {
     let sold = database::get::<_, U128>(utils::generate_seller_item_sold_key(resource_id)).unwrap();
     assert!(sold < item_info.item.stocks as U128);
     let sum = sold.checked_add(n).unwrap();
-    assert!(sum < item_info.item.stocks as U128);
+    assert!(sum <= item_info.item.stocks as U128);
     assert!(transfer_fee(
+        &item_info.resource_ddo.dtoken_contract_address,
         buyer_account,
         &item_info.resource_ddo.manager,
+        item_info.resource_ddo.mp_contract_address.clone(),
         &item_info.item.fee,
         n
     ));
     database::put(utils::generate_seller_item_sold_key(resource_id), sum);
     assert!(generate_dtoken(
+        &item_info.resource_ddo.dtoken_contract_address,
         buyer_account,
         resource_id,
         &item_info.item.templates,
@@ -108,27 +124,34 @@ fn buy_dtoken(resource_id: &str, n: U128, buyer_account: &Address) -> bool {
     true
 }
 
-fn use_token(resource_id: &str, account: &Address, token_hash: &H256, n: U128) -> bool {
+fn use_token(resource_id: &[u8], account: &Address, token_hash: &H256, n: U128) -> bool {
     assert!(runtime::check_witness(account));
     let item_info =
-        database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id));
-    assert!(item_info.is_some());
-    assert!(use_token_dtoken(account, resource_id, token_hash, n));
+        database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
+            .unwrap();
+    assert!(use_token_dtoken(
+        &item_info.resource_ddo.dtoken_contract_address,
+        account,
+        resource_id,
+        token_hash,
+        n
+    ));
     true
 }
 
 fn use_token_by_agent(
-    resource_id: &str,
+    resource_id: &[u8],
     account: &Address,
     agent: &Address,
-    token_hash: &str,
+    token_hash: &[u8],
     n: U128,
 ) -> bool {
     assert!(runtime::check_witness(agent));
     let item_info =
-        database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id));
-    assert!(item_info.is_some());
+        database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
+            .unwrap();
     assert!(use_token_by_agent_dtoken(
+        &item_info.resource_ddo.dtoken_contract_address,
         account,
         agent,
         resource_id,
@@ -138,82 +161,132 @@ fn use_token_by_agent(
     true
 }
 
-fn set_dtoken_agents(resource_id: &str, account: &Address, agents: Vec<&Address>, n: U128) -> bool {
-    assert!(runtime::check_witness(account));
-    let item_info =
-        database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id));
-    assert!(item_info.is_some());
-    set_agents_dtoken(account, resource_id, agents, n);
-    true
-}
-
-fn add_dtoken_agents(resource_id: &str, account: &Address, agents: Vec<&Address>, n: U128) -> bool {
-    assert!(runtime::check_witness(account));
-    let item_info =
-        database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id));
-    assert!(item_info.is_some());
-    assert!(add_dtoken_agents_dtoken(account, resource_id, agents, n));
-    true
-}
-
-fn remove_dtoken_agents(resource_id: &str, account: &Address, agents: Vec<&Address>) -> bool {
-    assert!(runtime::check_witness(account));
-    let item_info =
-        database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id));
-    assert!(item_info.is_some());
-    assert!(remove_agents(account, resource_id, agents));
-    true
-}
-
-fn remove_agents(account: &Address, resource_id: &str, agents: Vec<&Address>) -> bool {
-    true
-}
-
-fn transfer_fee(buyer_account: &Address, reseller_account: &Address, fee: &Fee, n: U128) -> bool {
-    true
-}
-
-fn set_agents_dtoken(account: &Address, resource_id: &str, agents: Vec<&Address>, n: U128) -> bool {
-    true
-}
-fn use_token_dtoken(account: &Address, resource_id: &str, token_hash: &H256, n: U128) -> bool {
-    true
-}
-
-fn add_dtoken_agents_dtoken(
+fn set_dtoken_agents(
+    resource_id: &[u8],
     account: &Address,
-    resource_id: &str,
     agents: Vec<&Address>,
     n: U128,
 ) -> bool {
-    true
-}
-fn use_token_by_agent_dtoken(
-    account: &Address,
-    agent: &Address,
-    resource_id: &str,
-    token_hash: &str,
-    n: U128,
-) -> bool {
-    true
-}
-
-fn transfer_dtoken(
-    from_account: &Address,
-    to_account: &Address,
-    resource_id: &str,
-    templates: &BTreeMap<String, bool>,
-    n: U128,
-) -> bool {
+    assert!(runtime::check_witness(account));
+    let item_info =
+        database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
+            .unwrap();
+    set_agents_dtoken(
+        &item_info.resource_ddo.dtoken_contract_address,
+        account,
+        resource_id,
+        agents,
+        n,
+    );
     true
 }
 
-fn generate_dtoken(
+fn add_dtoken_agents(
+    resource_id: &[u8],
     account: &Address,
-    resource_id: &str,
-    templates: &BTreeMap<String, bool>,
+    agents: Vec<&Address>,
     n: U128,
 ) -> bool {
+    assert!(runtime::check_witness(account));
+    let item_info =
+        database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
+            .unwrap();
+    assert!(add_agents_dtoken(
+        &item_info.resource_ddo.dtoken_contract_address,
+        account,
+        resource_id,
+        agents,
+        n
+    ));
+    true
+}
+
+fn add_token_agents(
+    resource_id: &[u8],
+    account: &Address,
+    token_hash: &[u8],
+    agents: Vec<&Address>,
+    n: U128,
+) -> bool {
+    assert!(runtime::check_witness(account));
+    let item_info =
+        database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
+            .unwrap();
+    assert!(add_token_agents_dtoken(
+        &item_info.resource_ddo.dtoken_contract_address,
+        account,
+        resource_id,
+        token_hash,
+        agents,
+        n
+    ));
+    true
+}
+
+fn remove_dtoken_agents(resource_id: &[u8], account: &Address, agents: Vec<&Address>) -> bool {
+    assert!(runtime::check_witness(account));
+    let item_info =
+        database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
+            .unwrap();
+    assert!(remove_agents(
+        &item_info.resource_ddo.dtoken_contract_address,
+        account,
+        resource_id,
+        agents
+    ));
+    true
+}
+fn transfer_fee(
+    contract_address: &Address,
+    buyer_account: &Address,
+    seller_account: &Address,
+    mp_contract_address: Option<Address>,
+    fee: &Fee,
+    n: U128,
+) -> bool {
+    if let Some(mp_addr) = mp_contract_address {
+        let mut sink = Sink::new(16);
+        sink.write(fee);
+        neo::call_contract(
+            &mp_addr,
+            (
+                "transferAmount",
+                (buyer_account, seller_account, sink.bytes(), n),
+            ),
+        );
+    } else {
+        let amt = n.checked_mul(fee.count as U128).unwrap();
+        assert!(transfer_inner(
+            buyer_account,
+            seller_account,
+            amt,
+            &fee.contract_type,
+            Some(fee.contract_addr)
+        ));
+    }
+    true
+}
+
+fn transfer_inner(
+    from: &Address,
+    to: &Address,
+    amt: U128,
+    contract_type: &TokenType,
+    contract_addr: Option<Address>,
+) -> bool {
+    match contract_type {
+        TokenType::ONG => {
+            assert!(ong::transfer(from, to, amt));
+        }
+        TokenType::ONT => {
+            assert!(ont::transfer(from, to, amt));
+        }
+        TokenType::OEP4 => {
+            //TODO
+            let contract_address = contract_addr.unwrap();
+            let res = neo::call_contract(&contract_address, ("transfer", (from, to, amt))).unwrap();
+        }
+    }
     true
 }
 
@@ -263,6 +336,16 @@ pub fn invoke() {
             let (resource_id, account, agents, n) = source.read().unwrap();
             sink.write(add_dtoken_agents(resource_id, account, agents, n));
         }
+        b"addTokenAgents" => {
+            let (resource_id, account, token_hash, agents, n) = source.read().unwrap();
+            sink.write(add_token_agents(
+                resource_id,
+                account,
+                token_hash,
+                agents,
+                n,
+            ));
+        }
         b"removeDtokenAgents" => {
             let (resource_id, account, agents) = source.read().unwrap();
             sink.write(remove_dtoken_agents(resource_id, account, agents));
@@ -279,7 +362,7 @@ mod events {
     use super::*;
     use ostd::macros::event;
     #[event(dtokenSellerPublishEvent)]
-    pub fn dtoken_seller_publish_event(resource_id: &str, resource_ddo: &[u8], item: &[u8]) {}
+    pub fn dtoken_seller_publish_event(resource_id: &[u8], resource_ddo: &[u8], item: &[u8]) {}
     #[event(buyDtokenFromReseller)]
     pub fn buy_dtoken_from_reseller(
         resource_id: &str,
@@ -293,11 +376,11 @@ mod events {
 mod utils {
     use super::*;
     use alloc::vec::Vec;
-    pub fn generate_seller_item_info_key(resource_id: &str) -> Vec<u8> {
-        [KEY_SELLER_ITEM_INFO, resource_id.as_bytes()].concat()
+    pub fn generate_seller_item_info_key(resource_id: &[u8]) -> Vec<u8> {
+        [KEY_SELLER_ITEM_INFO, resource_id].concat()
     }
-    pub fn generate_seller_item_sold_key(resource_id: &str) -> Vec<u8> {
-        [KEY_SELLER_ITEM_SOLD, resource_id.as_bytes()].concat()
+    pub fn generate_seller_item_sold_key(resource_id: &[u8]) -> Vec<u8> {
+        [KEY_SELLER_ITEM_SOLD, resource_id].concat()
     }
 }
 

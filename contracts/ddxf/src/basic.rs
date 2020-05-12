@@ -11,6 +11,8 @@ pub struct ResourceDDO {
     pub endpoint: String,                          // data service provider uri
     pub token_endpoint: BTreeMap<String, String>,  // endpoint for tokens
     pub desc_hash: Option<H256>,                   // required if len(Templates) > 1
+    pub dtoken_contract_address: Address,          // can not be empty
+    pub mp_contract_address: Option<Address>,      // can be empty
 }
 
 impl<'a> Encoder for ResourceDDO {
@@ -32,6 +34,13 @@ impl<'a> Encoder for ResourceDDO {
         if let Some(desc_hash) = &self.desc_hash {
             sink.write(true);
             sink.write(desc_hash);
+        } else {
+            sink.write(false);
+        }
+        sink.write(&self.dtoken_contract_address);
+        if let Some(mp_addr) = self.mp_contract_address {
+            sink.write(true);
+            sink.write(&mp_addr);
         } else {
             sink.write(false);
         }
@@ -64,7 +73,15 @@ impl<'a> Decoder<'a> for ResourceDDO {
             }
             false => None,
         };
-
+        let dtoken_contract_address = source.read()?;
+        let is_val: bool = source.read()?;
+        let mp_contract_address = match is_val {
+            true => {
+                let addr: Address = source.read()?;
+                Some(addr)
+            }
+            false => None,
+        };
         Ok(ResourceDDO {
             resource_type,
             token_resource_type,
@@ -72,6 +89,8 @@ impl<'a> Decoder<'a> for ResourceDDO {
             endpoint,
             token_endpoint: bmap,
             desc_hash,
+            dtoken_contract_address,
+            mp_contract_address,
         })
     }
 }
