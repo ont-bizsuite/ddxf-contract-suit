@@ -27,13 +27,19 @@ fn generate_dtoken(
     n: U128,
 ) -> bool {
     check_caller();
-    runtime::check_witness(&account);
+    runtime::check_witness(account);
+    let mut token_hashs =
+        database::get::<_, Vec<&[u8]>>(utils::generate_account_dtokens_key(resource_id, account))
+            .unwrap_or(vec![]);
     for (&token_hash, _) in templates.val.iter() {
         let mut caa = get_count_and_agent(resource_id, account, token_hash);
         caa.count += n as u32;
         update_count(resource_id, account, token_hash, caa);
+        if !token_hashs.contains(&token_hash) {
+            token_hashs.push(token_hash);
+        }
     }
-    let token_hashs: Vec<&[u8]> = templates.val.keys().cloned().collect();
+
     database::put(
         utils::generate_account_dtokens_key(resource_id, account),
         token_hashs,

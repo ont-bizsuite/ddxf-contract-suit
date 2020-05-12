@@ -7,40 +7,128 @@ use ostd::abi::{Decoder, Encoder, Error, Sink, Source};
 use ostd::database;
 use ostd::prelude::H256;
 use ostd::prelude::*;
-use ostd::runtime::{check_witness, input, ret};
+use ostd::runtime::{address, check_witness, input, ret};
 use ostd::types::{Address, U128};
+mod utils;
+use ostd::contract::{ong, ont};
+use utils::*;
+mod basic;
+use basic::*;
 
 const ADMIN: Address = ostd::macros::base58!("AbtTQJYKfQxq4UdygDsbLVjE8uRrJ2H3tP");
+const DECIMAL: U128 = 1000000000;
+const MAX_PERCENTAGE: u16 = 10000;
 
-const KEY_FEE_SPLIT_MODEL: &[u8] = b"01";
-const KEY_SELLER: &[u8] = b"02";
-const KEY_MP: &[u8] = b"03";
-
-#[derive(Encoder, Decoder)]
-struct FeeSplitModel {
-    percentage: u16,
-}
-
-fn init(mp_account: &Address, seller: &Address) -> bool {
-    database::put(KEY_MP, mp_account);
-    database::put(KEY_SELLER, seller);
+fn set_mp(mp_account: &Address) -> bool {
+    database::put(utils::KEY_MP, mp_account);
     true
 }
 
-fn set_fee_split_model(fee_split_model: FeeSplitModel) -> bool {
+fn set_fee_split_model(seller_acc: &Address, fee_split_model: FeeSplitModel) -> bool {
+    assert!(fee_split_model.percentage <= MAX_PERCENTAGE);
+    let mp = get_mp_account();
+    assert!(check_witness(seller_acc) && check_witness(&mp));
     let mp = database::get::<_, Address>(KEY_MP).unwrap();
-    let seller = database::get::<_, Address>(KEY_SELLER).unwrap();
-    assert!(check_witness(&mp) && check_witness(&seller));
-    database::put(KEY_FEE_SPLIT_MODEL, fee_split_model);
+    assert!(check_witness(&mp) && check_witness(&seller_acc));
+    database::put(
+        utils::generate_fee_split_model_key(seller_acc),
+        fee_split_model,
+    );
     true
 }
 
-fn get_fee_split_model() -> FeeSplitModel {
-    database::get::<_, FeeSplitModel>(utils::generate_fee_split_model_key())
+fn get_fee_split_model(seller_acc: &Address) -> FeeSplitModel {
+    database::get::<_, FeeSplitModel>(utils::generate_fee_split_model_key(seller_acc))
         .unwrap_or(FeeSplitModel { percentage: 0 })
 }
 
-fn settle() -> bool {}
+fn transfer_amount(buyer_acc: &Address, seller_acc: &Address, fee: Fee, n: U128) -> bool {
+    assert!(check_witness(buyer_acc));
+    let amt = n.checked_mul(fee.count as U128).unwrap();
+    let self_addr = address();
+    transfer(
+        buyer_acc,
+        &self_addr,
+        amt,
+        &fee.contract_type,
+        Some(fee.contract_addr.clone()),
+    );
+    let mut balance = balance_of(seller_acc, &fee.contract_type);
+    balance.balance += amt;
+    balance.contract_address = Some(fee.contract_addr);
+    database::put(
+        utils::generate_balance_key(seller_acc, &fee.contract_type),
+        balance,
+    );
+    true
+}
+
+fn balance_of(account: &Address, token_type: &TokenType) -> TokenBalance {
+    database::get::<_, TokenBalance>(utils::generate_balance_key(account, token_type))
+        .unwrap_or(TokenBalance::new(token_type.clone()))
+}
+
+fn settle(seller_acc: &Address) -> bool {
+    assert!(check_witness(seller_acc));
+    let self_addr = address();
+    let mp = get_mp_account();
+    let tokens = vec![TokenType::ONG, TokenType::ONT, TokenType::OEP4];
+    for token in tokens.iter() {
+        let balance = balance_of(seller_acc, &TokenType::ONG);
+        if balance.balance != 0 {
+            assert!(settle_inner(seller_acc, &self_addr, &mp, balance));
+        }
+    }
+    true
+}
+
+fn settle_inner(
+    seller_acc: &Address,
+    self_addr: &Address,
+    mp: &Address,
+    balance: TokenBalance,
+) -> bool {
+    let fee_split = get_fee_split_model(seller_acc);
+    let fee = balance
+        .balance
+        .checked_mul(fee_split.percentage as U128)
+        .unwrap();
+    assert!(transfer(
+        &self_addr,
+        &mp,
+        fee,
+        &balance.token_type,
+        balance.contract_address
+    ));
+    true
+}
+
+fn transfer(
+    from: &Address,
+    to: &Address,
+    amt: U128,
+    contract_type: &TokenType,
+    contract_addr: Option<Address>,
+) -> bool {
+    match contract_type {
+        TokenType::ONG => {
+            assert!(ong::transfer(from, to, amt));
+        }
+        TokenType::ONT => {
+            assert!(ont::transfer(from, to, amt));
+        }
+        TokenType::OEP4 => {
+            //TODO
+            let contract_address = contract_addr.unwrap();
+            assert!(ont::transfer(from, to, amt));
+        }
+    }
+    true
+}
+
+fn get_mp_account() -> Address {
+    database::get::<_, Address>(utils::KEY_MP).unwrap()
+}
 
 #[no_mangle]
 pub fn invoke() {
@@ -50,73 +138,27 @@ pub fn invoke() {
     let mut sink = Sink::new(12);
     match action {
         b"setFeeSplitModel" => {
-            let (account, resource_id, templates, n) = source.read().unwrap();
-            sink.write(generate_dtoken(account, resource_id, templates, n));
+            let (seller_acc, fee_split_model) = source.read().unwrap();
+            sink.write(set_fee_split_model(seller_acc, fee_split_model));
         }
-        b"useToken" => {
-            let (account, resource_id, token_hash, n) = source.read().unwrap();
-            sink.write(use_token(account, resource_id, token_hash, n));
+        b"get_fee_split_model" => {
+            let seller_acc = source.read().unwrap();
+            sink.write(get_fee_split_model(seller_acc));
         }
-        b"useTokenByAgent" => {
-            let (account, agent, resource_id, token_hash, n) = source.read().unwrap();
-            sink.write(use_token_by_agent(
-                account,
-                agent,
-                resource_id,
-                token_hash,
-                n,
-            ));
+        b"transfer_amount" => {
+            let (buyer_acc, seller_acc, fee, n) = source.read().unwrap();
+            sink.write(transfer_amount(buyer_acc, seller_acc, fee, n));
         }
-        b"transferDtoken" => {
-            let (from_account, to_account, resource_id, account, n) = source.read().unwrap();
-            sink.write(transfer_dtoken(
-                from_account,
-                to_account,
-                resource_id,
-                account,
-                n,
-            ));
+        b"balance_of" => {
+            let (account, token_type) = source.read().unwrap();
+            sink.write(balance_of(account, &token_type));
         }
-        b"setAgent" => {
-            let (account, resource_id, agents, n) = source.read().unwrap();
-            sink.write(set_agent(account, resource_id, agents, n));
+        b"settle" => {
+            let seller_acc = source.read().unwrap();
+            sink.write(settle(seller_acc));
         }
-        b"setTokenAgents" => {
-            let (account, resource_id, token_hash, agents, n) = source.read().unwrap();
-            sink.write(set_token_agents(
-                account,
-                resource_id,
-                token_hash,
-                agents,
-                n,
-            ));
-        }
-        b"addAgents" => {
-            let (account, resource_id, agents, n) = source.read().unwrap();
-            sink.write(add_agents(account, resource_id, agents, n));
-        }
-        b"addTokenAgents" => {
-            let (account, resource_id, token_hash, agents, n) = source.read().unwrap();
-            sink.write(add_token_agents(
-                account,
-                resource_id,
-                token_hash,
-                agents,
-                n,
-            ));
-        }
-        b"removeAgents" => {
-            let (account, resource_id, agents) = source.read().unwrap();
-            sink.write(remove_agents(account, resource_id, agents));
-        }
-        b"removeTokenAgents" => {
-            let (account, resource_id, token_hash, agents) = source.read().unwrap();
-            sink.write(remove_token_agents(
-                account,
-                resource_id,
-                token_hash,
-                agents,
-            ));
+        b"get_mp_account" => {
+            sink.write(get_mp_account());
         }
         _ => {
             let method = str::from_utf8(action).ok().unwrap();
