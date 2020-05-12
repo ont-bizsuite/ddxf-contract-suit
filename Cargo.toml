@@ -1,0 +1,12 @@
+[workspace]
+members = [
+    "contracts/ddxf",
+    "contracts/dtoken",
+    "contracts/marketplace"
+]
+
+[profile.release]
+panic = "abort"
+lto = true
+debug = true
+opt-level = "s"

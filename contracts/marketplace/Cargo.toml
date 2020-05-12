@@ -1,0 +1,17 @@
+[package]
+name = "marketplace"
+version = "0.1.0"
+authors = ["lucas7788 <sishsh@163.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+crate-type = ["cdylib"] #Compile as a dynamic link library
+
+[dependencies]
+ontio-std = {path="/Users/sss/dev/dockerData/rust_project/ontio-cdk-1/ontio-std"}
+
+[features]
+mock = ["ontio-std/mock"]
