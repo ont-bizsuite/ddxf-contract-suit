@@ -1,17 +1,17 @@
 use super::ostd::types::Address;
-use super::TokenTemplates;
 use super::*;
 
 #[test]
 fn generate_dtoken_test() {
     let account = Address::repeat_byte(1);
     let resource_id = b"resource_id";
-    let token_hash = b"token_hash";
-    let templates = TokenTemplates::new(token_hash);
+    let token_hash = vec![0u8, 32];
+    let template = TokenTemplate::new(token_hash);
+    let templates = vec![template.clone()];
     let n = 10;
     assert!(generate_dtoken(&account, resource_id, templates.clone(), n));
 
-    assert!(use_token(&account, resource_id, token_hash, 1));
+    assert!(use_token(&account, resource_id, template.clone(), 1));
 
     let agent = Address::repeat_byte(2);
     let agents: Vec<Address> = vec![agent.clone()];
@@ -22,7 +22,7 @@ fn generate_dtoken_test() {
         &account,
         &agent,
         resource_id,
-        token_hash,
+        template.clone(),
         1
     ));
 
@@ -38,7 +38,7 @@ fn generate_dtoken_test() {
     assert!(set_token_agents(
         &account,
         resource_id,
-        token_hash,
+        template.clone(),
         agents,
         1
     ));
@@ -50,7 +50,7 @@ fn generate_dtoken_test() {
     assert!(add_token_agents(
         &account,
         resource_id,
-        token_hash,
+        template.clone(),
         agents2.clone(),
         1
     ));
@@ -59,7 +59,7 @@ fn generate_dtoken_test() {
     assert!(remove_token_agents(
         &account,
         resource_id,
-        token_hash,
-        agents2
+        &template,
+        agents2.as_slice()
     ));
 }

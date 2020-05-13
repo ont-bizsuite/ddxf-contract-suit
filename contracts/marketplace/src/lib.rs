@@ -10,7 +10,7 @@ use ostd::prelude::*;
 use ostd::runtime::{address, check_witness, input, ret};
 use ostd::types::{Address, U128};
 mod utils;
-use ostd::contract::{wasm, ong, ont};
+use ostd::contract::{ong, ont, wasm};
 use utils::*;
 mod basic;
 use basic::*;
@@ -46,13 +46,13 @@ fn transfer_amount(buyer_acc: &Address, seller_acc: &Address, fee: Fee, n: U128)
     assert!(check_witness(buyer_acc));
     let amt = n.checked_mul(fee.count as U128).unwrap();
     let self_addr = address();
-    transfer(
+    assert!(transfer(
         buyer_acc,
         &self_addr,
         amt,
         &fee.contract_type,
         Some(fee.contract_addr.clone()),
-    );
+    ));
     let mut balance = balance_of(seller_acc, &fee.contract_type);
     balance.balance += amt;
     balance.contract_address = Some(fee.contract_addr);
@@ -120,7 +120,8 @@ fn transfer(
         TokenType::OEP4 => {
             //TODO
             let contract_address = contract_addr.unwrap();
-            let res = wasm::call_contract(&contract_address, ("transfer", (from, to, amt))).unwrap();
+            let res =
+                wasm::call_contract(&contract_address, ("transfer", (from, to, amt))).unwrap();
         }
     }
     true

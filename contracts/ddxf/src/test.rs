@@ -8,10 +8,10 @@ use ostd::mock::contract_mock::Command;
 fn publish() {
     let resource_id = b"resource_id";
 
-    let mut bmap: BTreeMap<String, RT> = BTreeMap::new();
+    let mut bmap: BTreeMap<TokenTemplate, RT> = BTreeMap::new();
     let temp = vec![0u8; 36];
-    let token_hash = String::from_utf8(temp).unwrap_or_default();
-    bmap.insert(token_hash.clone(), RT::RTStaticFile);
+    let token_template = TokenTemplate::new(temp);
+    bmap.insert(token_template.clone(), RT::RTStaticFile);
 
     let manager = Address::repeat_byte(1);
     let dtoken_contract_address = Address::repeat_byte(2);
@@ -26,6 +26,7 @@ fn publish() {
         desc_hash: None,
         dtoken_contract_address: dtoken_contract_address.clone(),
         mp_contract_address: None,
+        split_policy_contract_address: None,
     };
     let contract_addr = Address::repeat_byte(4);
     let fee = Fee {
@@ -33,8 +34,8 @@ fn publish() {
         contract_type: TokenType::ONG,
         count: 0,
     };
-    let mut templates = BTreeMap::new();
-    templates.insert(token_hash, true);
+    let mut templates = vec![];
+    templates.push(token_template.clone());
     let dtoken_item = DTokenItem {
         fee,
         expired_date: 1,
@@ -68,6 +69,7 @@ fn publish() {
 
     handle.witness(&[buyer.clone(), buyer2.clone()]);
     assert!(buy_dtoken_from_reseller(resource_id, 1, &buyer2, &buyer));
+    assert!(use_token(resource_id, &buyer2, token_template.clone(), 1));
 }
 
 fn mock_mp_contract(
@@ -104,6 +106,15 @@ fn mock_mp_contract(
 enum DtokenCommand {
     GenerateDToken(GenerateDToken),
     TransferDToken(TransferDToken),
+    UseToken(UseToken),
+}
+
+#[derive(Encoder, Decoder)]
+struct UseToken {
+    account: Address,
+    resource_id: Vec<u8>,
+    token_template: TokenTemplate,
+    n: U128,
 }
 
 #[derive(Encoder, Decoder)]
@@ -136,6 +147,9 @@ fn mock_dtoken_contract(
             sink.write(true);
         }
         DtokenCommand::TransferDToken(transfer) => {
+            sink.write(true);
+        }
+        DtokenCommand::UseToken(useToken) => {
             sink.write(true);
         }
     }

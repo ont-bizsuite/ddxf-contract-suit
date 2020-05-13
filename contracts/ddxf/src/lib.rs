@@ -90,7 +90,7 @@ fn buy_dtoken_from_reseller(
         reseller_account,
         item_info.resource_ddo.mp_contract_address,
         item_info.resource_ddo.split_policy_contract_address,
-        &item_info.item.fee,
+        item_info.item.fee.clone(),
         n
     ));
     assert!(transfer_dtoken(
@@ -122,7 +122,7 @@ fn buy_dtoken(resource_id: &[u8], n: U128, buyer_account: &Address) -> bool {
         &item_info.resource_ddo.manager,
         item_info.resource_ddo.mp_contract_address.clone(),
         item_info.resource_ddo.split_policy_contract_address,
-        &item_info.item.fee,
+        item_info.item.fee.clone(),
         n
     ));
     database::put(utils::generate_seller_item_sold_key(resource_id), sum);
@@ -160,7 +160,7 @@ fn use_token_by_agent(
     resource_id: &[u8],
     account: &Address,
     agent: &Address,
-    token_hash: &[u8],
+    token_template: TokenTemplate,
     n: U128,
 ) -> bool {
     assert!(runtime::check_witness(agent));
@@ -172,7 +172,7 @@ fn use_token_by_agent(
         account,
         agent,
         resource_id,
-        token_hash,
+        token_template,
         n
     ));
     true
@@ -259,22 +259,16 @@ fn transfer_fee(
     seller_account: &Address,
     mp_contract_address: Option<Address>,
     split_contract_address: Option<Address>,
-    fee: &Fee,
+    fee: Fee,
     n: U128,
 ) -> bool {
     if let Some(mp_addr) = mp_contract_address {
-        let mut sink = Sink::new(16);
-        sink.write(fee);
         wasm::call_contract(
             &mp_addr,
-            (
-                "transferAmount",
-                (buyer_account, seller_account, sink.bytes(), n),
-            ),
+            ("transferAmount", (buyer_account, seller_account, fee, n)),
         );
     } else {
         let amt = n.checked_mul(fee.count as U128).unwrap();
-        let mut to = seller_account;
         if let Some(split_contract_addr) = split_contract_address {
             assert!(transfer_inner(
                 buyer_account,
@@ -345,16 +339,16 @@ pub fn invoke() {
             sink.write(buy_dtoken(resource_id, n, buyer_account));
         }
         b"useToken" => {
-            let (resource_id, account, token_hash, n) = source.read().unwrap();
-            sink.write(use_token(resource_id, account, token_hash, n));
+            let (resource_id, account, token_template, n) = source.read().unwrap();
+            sink.write(use_token(resource_id, account, token_template, n));
         }
         b"useTokenByAgent" => {
-            let (resource_id, account, agent, token_hash, n) = source.read().unwrap();
+            let (resource_id, account, agent, token_template, n) = source.read().unwrap();
             sink.write(use_token_by_agent(
                 resource_id,
                 account,
                 agent,
-                token_hash,
+                token_template,
                 n,
             ));
         }
