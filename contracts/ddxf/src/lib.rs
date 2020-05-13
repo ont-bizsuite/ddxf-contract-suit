@@ -101,7 +101,8 @@ fn buy_dtoken(resource_id: &[u8], n: U128, buyer_account: &Address) -> bool {
             .unwrap();
     let now = runtime::timestamp();
     assert!(now < item_info.item.expired_date);
-    let sold = database::get::<_, U128>(utils::generate_seller_item_sold_key(resource_id)).unwrap();
+    let sold =
+        database::get::<_, U128>(utils::generate_seller_item_sold_key(resource_id)).unwrap_or(0);
     assert!(sold < item_info.item.stocks as U128);
     let sum = sold.checked_add(n).unwrap();
     assert!(sum <= item_info.item.stocks as U128);

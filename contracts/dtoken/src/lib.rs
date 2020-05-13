@@ -20,12 +20,9 @@ const KEY_ACCOUNT_DTOKENS: &[u8] = b"03";
 
 const DDXF_CONTRACT_ADDRESS: Address = ostd::macros::base58!("AbtTQJYKfQxq4UdygDsbLVjE8uRrJ2H3tP");
 
-fn generate_dtoken(
-    account: &Address,
-    resource_id: &[u8],
-    templates: TokenTemplates,
-    n: U128,
-) -> bool {
+fn generate_dtoken(account: &Address, resource_id: &[u8], templates_bytes: &[u8], n: U128) -> bool {
+    let mut source = Source::new(templates_bytes);
+    let templates: TokenTemplates = source.read()?;
     check_caller();
     runtime::check_witness(account);
     let mut token_hashs =
@@ -87,9 +84,11 @@ fn transfer_dtoken(
     from_account: &Address,
     to_account: &Address,
     resource_id: &[u8],
-    templates: TokenTemplates,
+    templates_bytes: &[u8],
     n: U128,
 ) -> bool {
+    let mut source = Source::new(templates_bytes);
+    let templates: TokenTemplates = source.read()?;
     check_caller();
     for (token_hash, v) in templates.val.iter() {
         let mut from_caa = get_count_and_agent(resource_id, from_account, token_hash);
@@ -103,7 +102,9 @@ fn transfer_dtoken(
     true
 }
 
-fn set_agent(account: &Address, resource_id: &[u8], agents: Vec<Address>, n: U128) -> bool {
+fn set_agent(account: &Address, resource_id: &[u8], agents_bytes: &[u8], n: U128) -> bool {
+    let mut source = Source::new(agents_bytes);
+    let agents: Vec<Address> = source.read()?;
     check_caller();
     let token_hashs = get_token_hashs(resource_id, account);
     for token_hash in token_hashs.iter() {
@@ -122,9 +123,11 @@ fn set_token_agents(
     account: &Address,
     resource_id: &[u8],
     token_hash: &[u8],
-    agents: Vec<Address>,
+    agents_bytes: &[u8],
     n: U128,
 ) -> bool {
+    let mut source = Source::new(agents_bytes);
+    let agents: Vec<Address> = source.read()?;
     check_caller();
     let mut caa = get_count_and_agent(resource_id, account, token_hash);
     caa.set_token_agents(agents.as_slice(), n);
@@ -132,7 +135,9 @@ fn set_token_agents(
     true
 }
 
-fn add_agents(account: &Address, resource_id: &[u8], agents: Vec<Address>, n: U128) -> bool {
+fn add_agents(account: &Address, resource_id: &[u8], agents_bytes: &[u8], n: U128) -> bool {
+    let mut source = Source::new(agents_bytes);
+    let agents: Vec<Address> = source.read()?;
     check_caller();
     let token_hashs = get_token_hashs(resource_id, account);
     for token_hash in token_hashs.iter() {
@@ -147,9 +152,11 @@ fn add_token_agents(
     account: &Address,
     resource_id: &[u8],
     token_hash: &[u8],
-    agents: Vec<Address>,
+    agents_bytes: &[u8],
     n: U128,
 ) -> bool {
+    let mut source = Source::new(agents_bytes);
+    let agents: Vec<Address> = source.read()?;
     check_caller();
     let mut caa = get_count_and_agent(resource_id, account, token_hash);
     caa.add_agents(agents.as_slice(), n as u32);
@@ -157,7 +164,9 @@ fn add_token_agents(
     true
 }
 
-fn remove_agents(account: &Address, resource_id: &[u8], agents: Vec<Address>) -> bool {
+fn remove_agents(account: &Address, resource_id: &[u8], agents_bytes: &[u8]) -> bool {
+    let mut source = Source::new(agents_bytes);
+    let agents: Vec<Address> = source.read()?;
     check_caller();
     let token_hashs = get_token_hashs(resource_id, account);
     for token_hash in token_hashs.iter() {
@@ -175,8 +184,10 @@ fn remove_token_agents(
     account: &Address,
     resource_id: &[u8],
     token_hash: &[u8],
-    agents: Vec<Address>,
+    agents_bytes: &[u8],
 ) -> bool {
+    let mut source = Source::new(agents_bytes);
+    let agents: Vec<Address> = source.read()?;
     check_caller();
     let mut caa = get_count_and_agent(resource_id, account, token_hash);
     caa.remove_agents(agents.as_slice());

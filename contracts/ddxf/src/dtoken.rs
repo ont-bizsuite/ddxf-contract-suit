@@ -1,5 +1,6 @@
 use super::ostd::abi::VmValueBuilder;
-use super::ostd::contract::neo;
+use super::ostd::contract::{neo, wasm};
+use super::ostd::runtime;
 use super::BTreeMap;
 use super::{Address, Sink, String, Vec, H256, U128};
 
@@ -11,7 +12,7 @@ pub fn remove_agents(
 ) -> bool {
     let mut sink = Sink::new(16);
     sink.write(agents);
-    neo::call_contract(
+    wasm::call_contract(
         contract_address,
         ("removeAgents", (account, resource_id, sink.bytes())),
     );
@@ -27,12 +28,13 @@ pub fn set_agents_dtoken(
 ) -> bool {
     let mut sink = Sink::new(16);
     sink.write(agents);
-    neo::call_contract(
+    wasm::call_contract(
         contract_address,
         ("setTokenAgents", (account, resource_id, sink.bytes(), n)),
     );
     true
 }
+
 pub fn use_token_dtoken(
     contract_address: &Address,
     account: &Address,
@@ -40,7 +42,7 @@ pub fn use_token_dtoken(
     token_hash: &H256,
     n: U128,
 ) -> bool {
-    neo::call_contract(
+    wasm::call_contract(
         contract_address,
         ("useToken", (account, resource_id, token_hash, n)),
     );
@@ -57,7 +59,7 @@ pub fn add_dtoken_agents_dtoken(
 ) -> bool {
     let mut sink = Sink::new(16);
     sink.write(agents);
-    neo::call_contract(
+    wasm::call_contract(
         contract_address,
         (
             "addTokenAgents",
@@ -75,7 +77,7 @@ pub fn add_agents_dtoken(
 ) -> bool {
     let mut sink = Sink::new(16);
     sink.write(agents);
-    neo::call_contract(
+    wasm::call_contract(
         contract_address,
         ("addAgents", (account, resource_id, sink.bytes(), n)),
     );
@@ -92,7 +94,7 @@ pub fn add_token_agents_dtoken(
 ) -> bool {
     let mut sink = Sink::new(16);
     sink.write(agents);
-    neo::call_contract(
+    wasm::call_contract(
         contract_address,
         (
             "addTokenAgents",
@@ -110,7 +112,7 @@ pub fn use_token_by_agent_dtoken(
     token_hash: &[u8],
     n: U128,
 ) -> bool {
-    neo::call_contract(
+    wasm::call_contract(
         contract_address,
         (
             "useTokenByAgent",
@@ -130,7 +132,7 @@ pub fn transfer_dtoken(
 ) -> bool {
     let mut sink = Sink::new(16);
     serialize_template(templates, &mut sink);
-    neo::call_contract(
+    wasm::call_contract(
         contract_address,
         (
             "transferDToken",
@@ -149,7 +151,7 @@ pub fn generate_dtoken(
 ) -> bool {
     let mut sink = Sink::new(16);
     serialize_template(templates, &mut sink);
-    neo::call_contract(
+    wasm::call_contract(
         contract_address,
         ("generateDToken", (account, resource_id, sink.bytes(), n)),
     );
@@ -160,7 +162,8 @@ fn serialize_template(templates: &BTreeMap<String, bool>, sink: &mut Sink) {
     let mut sink = Sink::new(16);
     let l = templates.len() as u32;
     sink.write(l);
-    for (template, _) in templates.iter() {
+    for (template, bool) in templates.iter() {
         sink.write(template);
+        sink.write(bool);
     }
 }
