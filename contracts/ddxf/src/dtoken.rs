@@ -3,6 +3,7 @@ use super::ostd::contract::{neo, wasm};
 use super::ostd::runtime;
 use super::BTreeMap;
 use super::{Address, Sink, String, Vec, H256, U128};
+use common::TokenTemplate;
 
 pub fn remove_agents(
     contract_address: &Address,
@@ -39,12 +40,12 @@ pub fn use_token_dtoken(
     contract_address: &Address,
     account: &Address,
     resource_id: &[u8],
-    token_hash: &H256,
+    token_template: TokenTemplate,
     n: U128,
 ) -> bool {
     wasm::call_contract(
         contract_address,
-        ("useToken", (account, resource_id, token_hash, n)),
+        ("useToken", (account, resource_id, token_template, n)),
     );
     true
 }
@@ -127,11 +128,11 @@ pub fn transfer_dtoken(
     from_account: &Address,
     to_account: &Address,
     resource_id: &[u8],
-    templates: &BTreeMap<String, bool>,
+    templates: &Vec<TokenTemplate>,
     n: U128,
 ) -> bool {
     let mut sink = Sink::new(16);
-    serialize_template(templates, &mut sink);
+    serialize_templates(templates, &mut sink);
     wasm::call_contract(
         contract_address,
         (
@@ -146,11 +147,11 @@ pub fn generate_dtoken(
     contract_address: &Address,
     account: &Address,
     resource_id: &[u8],
-    templates: &BTreeMap<String, bool>,
+    templates: &[TokenTemplate],
     n: U128,
 ) -> bool {
     let mut sink = Sink::new(16);
-    serialize_template(templates, &mut sink);
+    serialize_templates(templates, &mut sink);
     wasm::call_contract(
         contract_address,
         ("generateDToken", (account, resource_id, sink.bytes(), n)),
@@ -158,12 +159,11 @@ pub fn generate_dtoken(
     true
 }
 
-fn serialize_template(templates: &BTreeMap<String, bool>, sink: &mut Sink) {
+fn serialize_templates(templates: &[TokenTemplate], sink: &mut Sink) {
     let mut sink = Sink::new(16);
     let l = templates.len() as u32;
     sink.write(l);
-    for (template, bool) in templates.iter() {
+    for template in templates.iter() {
         sink.write(template);
-        sink.write(bool);
     }
 }

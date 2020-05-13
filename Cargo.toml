@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "common",
     "contracts/ddxf",
     "contracts/dtoken",
     "contracts/marketplace",

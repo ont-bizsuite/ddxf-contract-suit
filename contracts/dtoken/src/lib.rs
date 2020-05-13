@@ -1,8 +1,10 @@
 #![cfg_attr(not(feature = "mock"), no_std)]
 #![feature(proc_macro_hygiene)]
 extern crate alloc;
+extern crate common;
 extern crate ontio_std as ostd;
 use alloc::collections::btree_map::BTreeMap;
+use common::*;
 use ostd::abi::{Decoder, Encoder, Error, Sink, Source};
 use ostd::database;
 use ostd::prelude::H256;
@@ -20,36 +22,45 @@ const KEY_ACCOUNT_DTOKENS: &[u8] = b"03";
 
 const DDXF_CONTRACT_ADDRESS: Address = ostd::macros::base58!("AbtTQJYKfQxq4UdygDsbLVjE8uRrJ2H3tP");
 
-fn generate_dtoken(account: &Address, resource_id: &[u8], templates_bytes: &[u8], n: U128) -> bool {
-    let mut source = Source::new(templates_bytes);
-    let templates: TokenTemplates = source.read()?;
+fn generate_dtoken(
+    account: &Address,
+    resource_id: &[u8],
+    templates: Vec<TokenTemplate>,
+    n: U128,
+) -> bool {
     check_caller();
     runtime::check_witness(account);
-    let mut token_hashs =
-        database::get::<_, Vec<&[u8]>>(utils::generate_account_dtokens_key(resource_id, account))
-            .unwrap_or(vec![]);
-    for (&token_hash, _) in templates.val.iter() {
-        let mut caa = get_count_and_agent(resource_id, account, token_hash);
+    let mut token_templates = database::get::<_, Vec<TokenTemplate>>(
+        utils::generate_account_dtokens_key(resource_id, account),
+    )
+    .unwrap_or(vec![]);
+    for token_template in templates.iter() {
+        let mut caa = get_count_and_agent(resource_id, account, &token_template);
         caa.count += n as u32;
-        update_count(resource_id, account, token_hash, caa);
-        if !token_hashs.contains(&token_hash) {
-            token_hashs.push(token_hash);
+        update_count(resource_id, account, token_template, caa);
+        if !token_templates.contains(token_template) {
+            token_templates.push(token_template.clone());
         }
     }
 
     database::put(
         utils::generate_account_dtokens_key(resource_id, account),
-        token_hashs,
+        token_templates,
     );
     true
 }
 
-fn use_token(account: &Address, resource_id: &[u8], token_hash: &[u8], n: U128) -> bool {
+fn use_token(
+    account: &Address,
+    resource_id: &[u8],
+    token_template: TokenTemplate,
+    n: U128,
+) -> bool {
     check_caller();
-    let mut caa = get_count_and_agent(resource_id, account, token_hash);
+    let mut caa = get_count_and_agent(resource_id, account, &token_template);
     assert!(caa.count >= n as u32);
     caa.count -= n as u32;
-    let key = utils::generate_dtoken_key(resource_id, account, token_hash);
+    let key = utils::generate_dtoken_key(resource_id, account, &token_template);
     if caa.count == 0 {
         database::delete(key);
     } else {
@@ -62,20 +73,24 @@ fn use_token_by_agent(
     account: &Address,
     agent: &Address,
     resource_id: &[u8],
-    token_hash: &[u8],
+    token_template: TokenTemplate,
     n: U128,
 ) -> bool {
     check_caller();
-    let mut caa = get_count_and_agent(resource_id, account, token_hash);
+    let mut caa = get_count_and_agent(resource_id, account, &token_template);
     assert!(caa.count >= n as u32);
     let agent_count = caa.agents.get_mut(agent).unwrap();
     assert!(*agent_count >= n as u32);
     if caa.count == n as u32 && *agent_count == n as u32 {
-        database::delete(utils::generate_dtoken_key(resource_id, account, token_hash));
+        database::delete(utils::generate_dtoken_key(
+            resource_id,
+            account,
+            &token_template,
+        ));
     } else {
         caa.count -= n as u32;
         *agent_count -= n as u32;
-        update_count(resource_id, account, token_hash, caa);
+        update_count(resource_id, account, &token_template, caa);
     }
     true
 }
@@ -84,34 +99,30 @@ fn transfer_dtoken(
     from_account: &Address,
     to_account: &Address,
     resource_id: &[u8],
-    templates_bytes: &[u8],
+    templates: Vec<TokenTemplate>,
     n: U128,
 ) -> bool {
-    let mut source = Source::new(templates_bytes);
-    let templates: TokenTemplates = source.read()?;
     check_caller();
-    for (token_hash, v) in templates.val.iter() {
-        let mut from_caa = get_count_and_agent(resource_id, from_account, token_hash);
+    for token_template in templates.iter() {
+        let mut from_caa = get_count_and_agent(resource_id, from_account, &token_template);
         assert!(from_caa.count >= n as u32);
         from_caa.count -= n as u32;
-        update_count(resource_id, from_account, token_hash, from_caa);
-        let mut to_caa = get_count_and_agent(resource_id, to_account, token_hash);
+        update_count(resource_id, from_account, token_template, from_caa);
+        let mut to_caa = get_count_and_agent(resource_id, to_account, &token_template);
         to_caa.count += n as u32;
-        update_count(resource_id, to_account, token_hash, to_caa);
+        update_count(resource_id, to_account, token_template, to_caa);
     }
     true
 }
 
-fn set_agent(account: &Address, resource_id: &[u8], agents_bytes: &[u8], n: U128) -> bool {
-    let mut source = Source::new(agents_bytes);
-    let agents: Vec<Address> = source.read()?;
+fn set_agents(account: &Address, resource_id: &[u8], agents: Vec<Address>, n: U128) -> bool {
     check_caller();
-    let token_hashs = get_token_hashs(resource_id, account);
-    for token_hash in token_hashs.iter() {
+    let token_templates = get_token_templates(resource_id, account);
+    for token_template in token_templates.iter() {
         assert!(set_token_agents(
             account,
             resource_id,
-            token_hash,
+            token_template.clone(),
             agents.clone(),
             n
         ));
@@ -122,28 +133,24 @@ fn set_agent(account: &Address, resource_id: &[u8], agents_bytes: &[u8], n: U128
 fn set_token_agents(
     account: &Address,
     resource_id: &[u8],
-    token_hash: &[u8],
-    agents_bytes: &[u8],
+    token_template: TokenTemplate,
+    agents: Vec<Address>,
     n: U128,
 ) -> bool {
-    let mut source = Source::new(agents_bytes);
-    let agents: Vec<Address> = source.read()?;
     check_caller();
-    let mut caa = get_count_and_agent(resource_id, account, token_hash);
+    let mut caa = get_count_and_agent(resource_id, account, &token_template);
     caa.set_token_agents(agents.as_slice(), n);
-    update_count(resource_id, account, token_hash, caa);
+    update_count(resource_id, account, &token_template, caa);
     true
 }
 
-fn add_agents(account: &Address, resource_id: &[u8], agents_bytes: &[u8], n: U128) -> bool {
-    let mut source = Source::new(agents_bytes);
-    let agents: Vec<Address> = source.read()?;
+fn add_agents(account: &Address, resource_id: &[u8], agents: Vec<Address>, n: U128) -> bool {
     check_caller();
-    let token_hashs = get_token_hashs(resource_id, account);
-    for token_hash in token_hashs.iter() {
-        let mut caa = get_count_and_agent(resource_id, account, token_hash);
+    let token_templates = get_token_templates(resource_id, account);
+    for token_template in token_templates.iter() {
+        let mut caa = get_count_and_agent(resource_id, account, token_template);
         caa.add_agents(agents.as_slice(), n as u32);
-        update_count(resource_id, account, token_hash, caa);
+        update_count(resource_id, account, token_template, caa);
     }
     true
 }
@@ -151,30 +158,26 @@ fn add_agents(account: &Address, resource_id: &[u8], agents_bytes: &[u8], n: U12
 fn add_token_agents(
     account: &Address,
     resource_id: &[u8],
-    token_hash: &[u8],
-    agents_bytes: &[u8],
+    token_template: TokenTemplate,
+    agents: Vec<Address>,
     n: U128,
 ) -> bool {
-    let mut source = Source::new(agents_bytes);
-    let agents: Vec<Address> = source.read()?;
     check_caller();
-    let mut caa = get_count_and_agent(resource_id, account, token_hash);
+    let mut caa = get_count_and_agent(resource_id, account, &token_template);
     caa.add_agents(agents.as_slice(), n as u32);
-    update_count(resource_id, account, token_hash, caa);
+    update_count(resource_id, account, &token_template, caa);
     true
 }
 
-fn remove_agents(account: &Address, resource_id: &[u8], agents_bytes: &[u8]) -> bool {
-    let mut source = Source::new(agents_bytes);
-    let agents: Vec<Address> = source.read()?;
+fn remove_agents(account: &Address, resource_id: &[u8], agents: Vec<Address>) -> bool {
     check_caller();
-    let token_hashs = get_token_hashs(resource_id, account);
-    for token_hash in token_hashs.iter() {
+    let token_templates = get_token_templates(resource_id, account);
+    for token_template in token_templates.iter() {
         assert!(remove_token_agents(
             account,
             resource_id,
-            token_hash,
-            agents.clone()
+            token_template,
+            agents.as_slice()
         ));
     }
     true
@@ -183,21 +186,22 @@ fn remove_agents(account: &Address, resource_id: &[u8], agents_bytes: &[u8]) -> 
 fn remove_token_agents(
     account: &Address,
     resource_id: &[u8],
-    token_hash: &[u8],
-    agents_bytes: &[u8],
+    token_template: &TokenTemplate,
+    agents: &[Address],
 ) -> bool {
-    let mut source = Source::new(agents_bytes);
-    let agents: Vec<Address> = source.read()?;
     check_caller();
-    let mut caa = get_count_and_agent(resource_id, account, token_hash);
-    caa.remove_agents(agents.as_slice());
-    update_count(resource_id, account, token_hash, caa);
+    let mut caa = get_count_and_agent(resource_id, account, token_template);
+    caa.remove_agents(agents);
+    update_count(resource_id, account, token_template, caa);
     true
 }
 
-fn get_token_hashs(resource_id: &[u8], account: &Address) -> Vec<Vec<u8>> {
-    database::get::<_, Vec<Vec<u8>>>(utils::generate_account_dtokens_key(resource_id, account))
-        .unwrap()
+fn get_token_templates(resource_id: &[u8], account: &Address) -> Vec<TokenTemplate> {
+    database::get::<_, Vec<TokenTemplate>>(utils::generate_account_dtokens_key(
+        resource_id,
+        account,
+    ))
+    .unwrap()
 }
 
 fn check_caller() {
@@ -208,15 +212,24 @@ fn check_caller() {
 fn get_count_and_agent<'a>(
     resource_id: &[u8],
     account: &Address,
-    token_hash: &[u8],
+    token_template: &TokenTemplate,
 ) -> CountAndAgent {
-    database::get::<_, CountAndAgent>(utils::generate_dtoken_key(resource_id, account, token_hash))
-        .unwrap_or(CountAndAgent::new(account.clone()))
+    database::get::<_, CountAndAgent>(utils::generate_dtoken_key(
+        resource_id,
+        account,
+        token_template,
+    ))
+    .unwrap_or(CountAndAgent::new(account.clone()))
 }
 
-fn update_count(resource_id: &[u8], account: &Address, token_hash: &[u8], caa: CountAndAgent) {
+fn update_count(
+    resource_id: &[u8],
+    account: &Address,
+    token_template: &TokenTemplate,
+    caa: CountAndAgent,
+) {
     database::put(
-        utils::generate_dtoken_key(resource_id, account, token_hash),
+        utils::generate_dtoken_key(resource_id, account, token_template),
         caa,
     );
 }
@@ -233,16 +246,16 @@ pub fn invoke() {
             sink.write(generate_dtoken(account, resource_id, templates, n));
         }
         b"useToken" => {
-            let (account, resource_id, token_hash, n) = source.read().unwrap();
-            sink.write(use_token(account, resource_id, token_hash, n));
+            let (account, resource_id, token_template, n) = source.read().unwrap();
+            sink.write(use_token(account, resource_id, token_template, n));
         }
         b"useTokenByAgent" => {
-            let (account, agent, resource_id, token_hash, n) = source.read().unwrap();
+            let (account, agent, resource_id, token_template, n) = source.read().unwrap();
             sink.write(use_token_by_agent(
                 account,
                 agent,
                 resource_id,
-                token_hash,
+                token_template,
                 n,
             ));
         }
@@ -256,9 +269,9 @@ pub fn invoke() {
                 n,
             ));
         }
-        b"setAgent" => {
+        b"setAgents" => {
             let (account, resource_id, agents, n) = source.read().unwrap();
-            sink.write(set_agent(account, resource_id, agents, n));
+            sink.write(set_agents(account, resource_id, agents, n));
         }
         b"setTokenAgents" => {
             let (account, resource_id, token_hash, agents, n) = source.read().unwrap();
@@ -275,11 +288,11 @@ pub fn invoke() {
             sink.write(add_agents(account, resource_id, agents, n));
         }
         b"addTokenAgents" => {
-            let (account, resource_id, token_hash, agents, n) = source.read().unwrap();
+            let (account, resource_id, token_template, agents, n) = source.read().unwrap();
             sink.write(add_token_agents(
                 account,
                 resource_id,
-                token_hash,
+                token_template,
                 agents,
                 n,
             ));
@@ -289,12 +302,17 @@ pub fn invoke() {
             sink.write(remove_agents(account, resource_id, agents));
         }
         b"removeTokenAgents" => {
-            let (account, resource_id, token_hash, agents) = source.read().unwrap();
+            let (account, resource_id, token_template, agents): (
+                &Address,
+                &[u8],
+                TokenTemplate,
+                Vec<Address>,
+            ) = source.read().unwrap();
             sink.write(remove_token_agents(
                 account,
                 resource_id,
-                token_hash,
-                agents,
+                &token_template,
+                agents.as_slice(),
             ));
         }
         _ => {
@@ -311,9 +329,15 @@ mod utils {
     pub fn generate_dtoken_key(
         resource_id: &[u8],
         account: &Address,
-        token_hash: &[u8],
+        token_template: &TokenTemplate,
     ) -> Vec<u8> {
-        [KEY_DTOKEN, resource_id, account.as_ref(), token_hash].concat()
+        [
+            KEY_DTOKEN,
+            resource_id,
+            account.as_ref(),
+            &token_template.serialize(),
+        ]
+        .concat()
     }
     pub fn generate_agent_key(
         resource_id: &[u8],
