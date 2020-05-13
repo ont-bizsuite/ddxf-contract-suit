@@ -16,7 +16,7 @@ fn generate_dtoken_test() {
     let agent = Address::repeat_byte(2);
     let agents: Vec<Address> = vec![agent.clone()];
 
-    assert!(set_agent(&account, resource_id, agents.clone(), n));
+    assert!(set_agents(&account, resource_id, agents.clone(), n));
 
     assert!(use_token_by_agent(
         &account,

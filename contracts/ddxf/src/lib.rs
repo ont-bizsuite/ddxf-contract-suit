@@ -1,6 +1,7 @@
 #![cfg_attr(not(feature = "mock"), no_std)]
 #![feature(proc_macro_hygiene)]
 extern crate alloc;
+extern crate common;
 extern crate ontio_std as ostd;
 use alloc::collections::btree_map::BTreeMap;
 use ostd::abi::{Decoder, Encoder, Error, Sink, Source};
@@ -12,8 +13,9 @@ use ostd::types::{Address, U128};
 mod basic;
 use basic::*;
 mod dtoken;
+use common::*;
 use dtoken::*;
-use ostd::contract::{neo, ong, ont};
+use ostd::contract::{ong, ont, wasm};
 
 #[cfg(test)]
 mod test;
@@ -35,19 +37,26 @@ fn dtoken_seller_publish(
     assert!(resource.is_none());
     if &resource_ddo.endpoint == "" {
         assert_ne!(resource_ddo.token_endpoint.len(), 0);
-        for (token_hash, _) in item.templates.iter() {
-            assert_ne!(resource_ddo.token_endpoint[token_hash], "");
+        for token_template in item.templates.iter() {
+            assert_ne!(resource_ddo.token_endpoint.get(token_template).unwrap(), "");
         }
     }
     assert_ne!(item.templates.len(), 0);
-    for (token_hash, _) in item.templates.iter() {
+    for token_template in item.templates.iter() {
         let rt = resource_ddo
             .token_resource_type
-            .get(token_hash)
+            .get(token_template)
             .unwrap_or(&resource_ddo.resource_type);
         match rt {
             RT::RTStaticFile => {
-                assert_eq!(token_hash.len() as u32, SHA256_SIZE + CRC32_SIZE);
+                if token_template.data_ids.is_none() {
+                    assert_eq!(
+                        token_template.token_hash.len() as u32,
+                        SHA256_SIZE + CRC32_SIZE
+                    );
+                } else {
+                    assert_eq!(token_template.token_hash.len() as u32, SHA256_SIZE);
+                }
             }
         }
     }
@@ -79,7 +88,8 @@ fn buy_dtoken_from_reseller(
         &item_info.resource_ddo.dtoken_contract_address,
         buyer_account,
         reseller_account,
-        None,
+        item_info.resource_ddo.mp_contract_address,
+        item_info.resource_ddo.split_policy_contract_address,
         &item_info.item.fee,
         n
     ));
@@ -101,7 +111,8 @@ fn buy_dtoken(resource_id: &[u8], n: U128, buyer_account: &Address) -> bool {
             .unwrap();
     let now = runtime::timestamp();
     assert!(now < item_info.item.expired_date);
-    let sold = database::get::<_, U128>(utils::generate_seller_item_sold_key(resource_id)).unwrap();
+    let sold =
+        database::get::<_, U128>(utils::generate_seller_item_sold_key(resource_id)).unwrap_or(0);
     assert!(sold < item_info.item.stocks as U128);
     let sum = sold.checked_add(n).unwrap();
     assert!(sum <= item_info.item.stocks as U128);
@@ -110,6 +121,7 @@ fn buy_dtoken(resource_id: &[u8], n: U128, buyer_account: &Address) -> bool {
         buyer_account,
         &item_info.resource_ddo.manager,
         item_info.resource_ddo.mp_contract_address.clone(),
+        item_info.resource_ddo.split_policy_contract_address,
         &item_info.item.fee,
         n
     ));
@@ -124,7 +136,12 @@ fn buy_dtoken(resource_id: &[u8], n: U128, buyer_account: &Address) -> bool {
     true
 }
 
-fn use_token(resource_id: &[u8], account: &Address, token_hash: &H256, n: U128) -> bool {
+fn use_token(
+    resource_id: &[u8],
+    account: &Address,
+    token_template: TokenTemplate,
+    n: U128,
+) -> bool {
     assert!(runtime::check_witness(account));
     let item_info =
         database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
@@ -133,7 +150,7 @@ fn use_token(resource_id: &[u8], account: &Address, token_hash: &H256, n: U128) 
         &item_info.resource_ddo.dtoken_contract_address,
         account,
         resource_id,
-        token_hash,
+        token_template,
         n
     ));
     true
@@ -241,13 +258,14 @@ fn transfer_fee(
     buyer_account: &Address,
     seller_account: &Address,
     mp_contract_address: Option<Address>,
+    split_contract_address: Option<Address>,
     fee: &Fee,
     n: U128,
 ) -> bool {
     if let Some(mp_addr) = mp_contract_address {
         let mut sink = Sink::new(16);
         sink.write(fee);
-        neo::call_contract(
+        wasm::call_contract(
             &mp_addr,
             (
                 "transferAmount",
@@ -256,13 +274,24 @@ fn transfer_fee(
         );
     } else {
         let amt = n.checked_mul(fee.count as U128).unwrap();
-        assert!(transfer_inner(
-            buyer_account,
-            seller_account,
-            amt,
-            &fee.contract_type,
-            Some(fee.contract_addr)
-        ));
+        let mut to = seller_account;
+        if let Some(split_contract_addr) = split_contract_address {
+            assert!(transfer_inner(
+                buyer_account,
+                &split_contract_addr,
+                amt,
+                &fee.contract_type,
+                Some(fee.contract_addr)
+            ));
+        } else {
+            assert!(transfer_inner(
+                buyer_account,
+                seller_account,
+                amt,
+                &fee.contract_type,
+                Some(fee.contract_addr)
+            ));
+        }
     }
     true
 }
@@ -284,7 +313,8 @@ fn transfer_inner(
         TokenType::OEP4 => {
             //TODO
             let contract_address = contract_addr.unwrap();
-            let res = neo::call_contract(&contract_address, ("transfer", (from, to, amt))).unwrap();
+            let res =
+                wasm::call_contract(&contract_address, ("transfer", (from, to, amt))).unwrap();
         }
     }
     true

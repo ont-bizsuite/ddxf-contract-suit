@@ -10,6 +10,7 @@ crate-type = ["cdylib"] #Compile as a dynamic link library
 
 [dependencies]
 ontio-std = {path="/Users/sss/dev/dockerData/rust_project/ontio-cdk-1/ontio-std"}
+common = {path="../../common"}
 
 [features]
 mock = ["ontio-std/mock"]

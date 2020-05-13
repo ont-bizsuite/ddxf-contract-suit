@@ -1,18 +1,21 @@
 use super::ostd::abi::{Decoder, Encoder, Error, Sink, Source};
+use super::ostd::prelude::*;
 use super::ostd::types::{Address, H256, U128};
 use super::BTreeMap;
 use super::String;
+use common::TokenTemplate;
 
 #[derive(Clone)]
 pub struct ResourceDDO {
-    pub resource_type: RT,                         //0:RTStaticFile,
-    pub token_resource_type: BTreeMap<String, RT>, // RT for tokens
-    pub manager: Address,                          // data owner id
-    pub endpoint: String,                          // data service provider uri
-    pub token_endpoint: BTreeMap<String, String>,  // endpoint for tokens
-    pub desc_hash: Option<H256>,                   // required if len(Templates) > 1
-    pub dtoken_contract_address: Address,          // can not be empty
-    pub mp_contract_address: Option<Address>,      // can be empty
+    pub resource_type: RT,                                //0:RTStaticFile,
+    pub token_resource_type: BTreeMap<TokenTemplate, RT>, // RT for tokens
+    pub manager: Address,                                 // data owner id
+    pub endpoint: String,                                 // data service provider uri
+    pub token_endpoint: BTreeMap<TokenTemplate, String>,  // endpoint for tokens
+    pub desc_hash: Option<H256>,                          // required if len(Templates) > 1
+    pub dtoken_contract_address: Address,                 // can not be empty
+    pub mp_contract_address: Option<Address>,             // can be empty
+    pub split_policy_contract_address: Option<Address>,   //can be empty
 }
 
 impl<'a> Encoder for ResourceDDO {
@@ -38,9 +41,15 @@ impl<'a> Encoder for ResourceDDO {
             sink.write(false);
         }
         sink.write(&self.dtoken_contract_address);
-        if let Some(mp_addr) = self.mp_contract_address {
+        if let Some(mp_addr) = &self.mp_contract_address {
             sink.write(true);
-            sink.write(&mp_addr);
+            sink.write(mp_addr);
+        } else {
+            sink.write(false);
+        }
+        if let Some(split_contract_address) = &self.split_policy_contract_address {
+            sink.write(true);
+            sink.write(split_contract_address);
         } else {
             sink.write(false);
         }
@@ -51,7 +60,7 @@ impl<'a> Decoder<'a> for ResourceDDO {
     fn decode(source: &mut Source<'a>) -> Result<Self, Error> {
         let resource_type = source.read()?;
         let l: u32 = source.read()?;
-        let mut token_resource_type: BTreeMap<String, RT> = BTreeMap::new();
+        let mut token_resource_type: BTreeMap<TokenTemplate, RT> = BTreeMap::new();
         for _ in 0..l {
             let (k, v) = source.read()?;
             token_resource_type.insert(k, v);
@@ -59,9 +68,9 @@ impl<'a> Decoder<'a> for ResourceDDO {
         let manager: Address = source.read().unwrap();
         let endpoint: String = source.read().unwrap();
         let l: u32 = source.read().unwrap();
-        let mut bmap: BTreeMap<String, String> = BTreeMap::new();
+        let mut bmap: BTreeMap<TokenTemplate, String> = BTreeMap::new();
         for _ in 0..l {
-            let k: String = source.read().unwrap();
+            let k: TokenTemplate = source.read().unwrap();
             let v: String = source.read().unwrap();
             bmap.insert(k, v);
         }
@@ -82,6 +91,14 @@ impl<'a> Decoder<'a> for ResourceDDO {
             }
             false => None,
         };
+        let is_val: bool = source.read()?;
+        let split_policy_contract_address = match is_val {
+            true => {
+                let addr: Address = source.read()?;
+                Some(addr)
+            }
+            false => None,
+        };
         Ok(ResourceDDO {
             resource_type,
             token_resource_type,
@@ -91,6 +108,7 @@ impl<'a> Decoder<'a> for ResourceDDO {
             desc_hash,
             dtoken_contract_address,
             mp_contract_address,
+            split_policy_contract_address,
         })
     }
 }
@@ -137,7 +155,7 @@ pub struct DTokenItem {
     pub fee: Fee,
     pub expired_date: u64,
     pub stocks: u32,
-    pub templates: BTreeMap<String, bool>,
+    pub templates: Vec<TokenTemplate>,
 }
 impl Encoder for DTokenItem {
     fn encode(&self, sink: &mut Sink) {
@@ -145,9 +163,8 @@ impl Encoder for DTokenItem {
         sink.write(self.expired_date);
         sink.write(self.stocks);
         sink.write(self.templates.len() as u32);
-        for (k, v) in self.templates.iter() {
-            sink.write(k);
-            sink.write(v);
+        for token in self.templates.iter() {
+            sink.write(token);
         }
     }
 }
@@ -157,11 +174,11 @@ impl<'a> Decoder<'a> for DTokenItem {
         let fee: Fee = source.read()?;
         let expired_date: u64 = source.read()?;
         let stocks: u32 = source.read()?;
-        let mut templates: BTreeMap<String, bool> = BTreeMap::new();
+        let mut templates: Vec<TokenTemplate> = vec![];
         let l: u32 = source.read()?;
         for _ in 0..l {
-            let (k, v) = source.read()?;
-            templates.insert(k, v);
+            let v = source.read()?;
+            templates.push(v);
         }
         Ok(DTokenItem {
             fee,
