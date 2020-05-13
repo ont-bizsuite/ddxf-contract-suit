@@ -10,7 +10,7 @@ use ostd::prelude::*;
 use ostd::runtime::{address, check_witness, input, ret};
 use ostd::types::{Address, U128};
 mod utils;
-use ostd::contract::{neo, ong, ont};
+use ostd::contract::{wasm, ong, ont};
 use utils::*;
 mod basic;
 use basic::*;
@@ -120,7 +120,7 @@ fn transfer(
         TokenType::OEP4 => {
             //TODO
             let contract_address = contract_addr.unwrap();
-            let res = neo::call_contract(&contract_address, ("transfer", (from, to, amt))).unwrap();
+            let res = wasm::call_contract(&contract_address, ("transfer", (from, to, amt))).unwrap();
         }
     }
     true
