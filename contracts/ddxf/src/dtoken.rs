@@ -110,14 +110,14 @@ pub fn use_token_by_agent_dtoken(
     account: &Address,
     agent: &Address,
     resource_id: &[u8],
-    token_hash: &[u8],
+    token_template: TokenTemplate,
     n: U128,
 ) -> bool {
     wasm::call_contract(
         contract_address,
         (
             "useTokenByAgent",
-            (account, agent, resource_id, token_hash, n),
+            (account, agent, resource_id, token_template, n),
         ),
     );
     true

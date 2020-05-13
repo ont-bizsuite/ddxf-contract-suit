@@ -81,6 +81,7 @@ impl Encoder for CountAndAgent {
         }
     }
 }
+
 impl<'a> Decoder<'a> for CountAndAgent {
     fn decode(source: &mut Source<'a>) -> Result<Self, Error> {
         let count: u32 = source.read()?;

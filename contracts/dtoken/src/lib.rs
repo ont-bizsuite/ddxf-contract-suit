@@ -35,7 +35,7 @@ fn generate_dtoken(
     )
     .unwrap_or(vec![]);
     for token_template in templates.iter() {
-        let mut caa = get_count_and_agent(resource_id, account, &token_template);
+        let mut caa = get_count_and_agent(resource_id, account, token_template);
         caa.count += n as u32;
         update_count(resource_id, account, token_template, caa);
         if !token_templates.contains(token_template) {
