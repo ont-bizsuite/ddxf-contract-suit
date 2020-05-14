@@ -112,6 +112,37 @@ fn buy_dtokens(resource_ids: Vec<&[u8]>, ns: Vec<U128>, buyer_account: &Address)
     true
 }
 
+fn buy_dtokens_and_set_agents(
+    resource_ids: Vec<&[u8]>,
+    ns: Vec<U128>,
+    use_index: U128,
+    authorized_index: U128,
+    authorized_token_hash: Vec<u8>,
+    use_token_hash: Vec<u8>,
+    buyer_account: &Address,
+    agent: &Address,
+) -> bool {
+    let l = resource_ids.len();
+    assert_eq!(l, ns.len());
+    for i in 0..l {
+        assert!(buy_dtoken(resource_ids[i], ns[i], buyer_account));
+    }
+    assert!(set_token_agents(
+        resource_ids[authorized_index as usize],
+        buyer_account,
+        vec![agent],
+        TokenTemplate::new(authorized_token_hash),
+        ns[authorized_index as usize],
+    ));
+    assert!(use_token(
+        resource_ids[use_index as usize],
+        buyer_account,
+        TokenTemplate::new(use_token_hash),
+        ns[use_index as usize]
+    ));
+    true
+}
+
 fn buy_dtoken(resource_id: &[u8], n: U128, buyer_account: &Address) -> bool {
     assert!(runtime::check_witness(buyer_account));
     let item_info =
@@ -185,12 +216,7 @@ fn use_token_by_agent(
     true
 }
 
-fn set_dtoken_agents(
-    resource_id: &[u8],
-    account: &Address,
-    agents: Vec<&Address>,
-    n: U128,
-) -> bool {
+fn set_agents(resource_id: &[u8], account: &Address, agents: Vec<&Address>, n: U128) -> bool {
     assert!(runtime::check_witness(account));
     let item_info =
         database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
@@ -206,12 +232,29 @@ fn set_dtoken_agents(
     true
 }
 
-fn add_dtoken_agents(
+fn set_token_agents(
     resource_id: &[u8],
     account: &Address,
     agents: Vec<&Address>,
+    template: TokenTemplate,
     n: U128,
 ) -> bool {
+    assert!(runtime::check_witness(account));
+    let item_info =
+        database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
+            .unwrap();
+    set_token_agents_dtoken(
+        &item_info.resource_ddo.dtoken_contract_address,
+        account,
+        resource_id,
+        template,
+        agents,
+        n,
+    );
+    true
+}
+
+fn add_agents(resource_id: &[u8], account: &Address, agents: Vec<&Address>, n: U128) -> bool {
     assert!(runtime::check_witness(account));
     let item_info =
         database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
@@ -249,17 +292,37 @@ fn add_token_agents(
     true
 }
 
-fn remove_dtoken_agents(resource_id: &[u8], account: &Address, agents: Vec<&Address>) -> bool {
+fn remove_agents(resource_id: &[u8], account: &Address, agents: Vec<&Address>) -> bool {
     assert!(runtime::check_witness(account));
     let item_info =
         database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
             .unwrap();
-    assert!(remove_agents(
+    assert!(remove_agents_dtoken(
         &item_info.resource_ddo.dtoken_contract_address,
         account,
         resource_id,
         agents,
         &item_info.item.templates
+    ));
+    true
+}
+
+fn remove_token_agents(
+    resource_id: &[u8],
+    token_template: TokenTemplate,
+    account: &Address,
+    agents: Vec<&Address>,
+) -> bool {
+    assert!(runtime::check_witness(account));
+    let item_info =
+        database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
+            .unwrap();
+    assert!(remove_token_agents_dtoken(
+        &item_info.resource_ddo.dtoken_contract_address,
+        account,
+        resource_id,
+        token_template,
+        agents,
     ));
     true
 }
@@ -366,11 +429,11 @@ pub fn invoke() {
         }
         b"setDtokenAgents" => {
             let (resource_id, account, agents, n) = source.read().unwrap();
-            sink.write(set_dtoken_agents(resource_id, account, agents, n));
+            sink.write(set_agents(resource_id, account, agents, n));
         }
         b"addDtokenAgents" => {
             let (resource_id, account, agents, n) = source.read().unwrap();
-            sink.write(add_dtoken_agents(resource_id, account, agents, n));
+            sink.write(add_agents(resource_id, account, agents, n));
         }
         b"addTokenAgents" => {
             let (resource_id, account, token_hash, agents, n) = source.read().unwrap();
@@ -384,7 +447,7 @@ pub fn invoke() {
         }
         b"removeDtokenAgents" => {
             let (resource_id, account, agents) = source.read().unwrap();
-            sink.write(remove_dtoken_agents(resource_id, account, agents));
+            sink.write(remove_agents(resource_id, account, agents));
         }
         _ => {
             let method = str::from_utf8(action).ok().unwrap();

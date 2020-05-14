@@ -3,7 +3,7 @@ use super::DEFAULT_DTOKEN_CONTRACT_ADDRESS;
 use super::{Address, Sink, Vec, U128};
 use common::TokenTemplate;
 
-pub fn remove_agents(
+pub fn remove_agents_dtoken(
     contract_address: &Option<Address>,
     account: &Address,
     resource_id: &[u8],
@@ -16,6 +16,21 @@ pub fn remove_agents(
     );
     true
 }
+
+pub fn remove_token_agents_dtoken(
+    contract_address: &Option<Address>,
+    account: &Address,
+    resource_id: &[u8],
+    template: TokenTemplate,
+    agents: Vec<&Address>,
+) -> bool {
+    wasm::call_contract(
+        &contract_address.unwrap_or(DEFAULT_DTOKEN_CONTRACT_ADDRESS),
+        ("removeAgents", (account, resource_id, agents, template)),
+    );
+    true
+}
+
 pub fn set_agents_dtoken(
     contract_address: &Option<Address>,
     account: &Address,
@@ -38,6 +53,7 @@ pub fn set_token_agents_dtoken(
     contract_address: &Option<Address>,
     account: &Address,
     resource_id: &[u8],
+    token_template: TokenTemplate,
     agents: Vec<&Address>,
     n: U128,
 ) -> bool {
