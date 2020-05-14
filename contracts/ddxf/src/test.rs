@@ -7,7 +7,6 @@ use ostd::mock::contract_mock::Command;
 #[test]
 fn publish() {
     let resource_id = b"resource_id";
-
     let mut bmap: BTreeMap<TokenTemplate, RT> = BTreeMap::new();
     let temp = vec![0u8; 36];
     let token_template = TokenTemplate::new(temp);
@@ -79,7 +78,6 @@ fn mock_mp_contract(
     let mut sink = Sink::new(12);
     let mut source = Source::new(_data);
     let command = Command::decode(&mut source).ok().unwrap();
-    println!("{:?}", command);
     match command {
         Command::Transfer { from, to, value } => {
             let mut from_ba = ong_balance_map.get(from).map(|val| val.clone()).unwrap();

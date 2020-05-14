@@ -29,24 +29,12 @@ fn generate_dtoken(
     n: U128,
 ) -> bool {
     check_caller();
-    runtime::check_witness(account);
-    let mut token_templates = database::get::<_, Vec<TokenTemplate>>(
-        utils::generate_account_dtokens_key(resource_id, account),
-    )
-    .unwrap_or(vec![]);
+    assert!(runtime::check_witness(account));
     for token_template in templates.iter() {
         let mut caa = get_count_and_agent(resource_id, account, token_template);
         caa.count += n as u32;
         update_count(resource_id, account, token_template, caa);
-        if !token_templates.contains(token_template) {
-            token_templates.push(token_template.clone());
-        }
     }
-
-    database::put(
-        utils::generate_account_dtokens_key(resource_id, account),
-        token_templates,
-    );
     true
 }
 
@@ -115,9 +103,14 @@ fn transfer_dtoken(
     true
 }
 
-fn set_agents(account: &Address, resource_id: &[u8], agents: Vec<Address>, n: U128) -> bool {
+fn set_agents(
+    account: &Address,
+    resource_id: &[u8],
+    agents: Vec<Address>,
+    n: U128,
+    token_templates: Vec<TokenTemplate>,
+) -> bool {
     check_caller();
-    let token_templates = get_token_templates(resource_id, account);
     for token_template in token_templates.iter() {
         assert!(set_token_agents(
             account,
@@ -144,9 +137,14 @@ fn set_token_agents(
     true
 }
 
-fn add_agents(account: &Address, resource_id: &[u8], agents: Vec<Address>, n: U128) -> bool {
+fn add_agents(
+    account: &Address,
+    resource_id: &[u8],
+    agents: Vec<Address>,
+    n: U128,
+    token_templates: Vec<TokenTemplate>,
+) -> bool {
     check_caller();
-    let token_templates = get_token_templates(resource_id, account);
     for token_template in token_templates.iter() {
         let mut caa = get_count_and_agent(resource_id, account, token_template);
         caa.add_agents(agents.as_slice(), n as u32);
@@ -169,9 +167,13 @@ fn add_token_agents(
     true
 }
 
-fn remove_agents(account: &Address, resource_id: &[u8], agents: Vec<Address>) -> bool {
+fn remove_agents(
+    account: &Address,
+    resource_id: &[u8],
+    agents: Vec<Address>,
+    token_templates: Vec<TokenTemplate>,
+) -> bool {
     check_caller();
-    let token_templates = get_token_templates(resource_id, account);
     for token_template in token_templates.iter() {
         assert!(remove_token_agents(
             account,
@@ -194,14 +196,6 @@ fn remove_token_agents(
     caa.remove_agents(agents);
     update_count(resource_id, account, token_template, caa);
     true
-}
-
-fn get_token_templates(resource_id: &[u8], account: &Address) -> Vec<TokenTemplate> {
-    database::get::<_, Vec<TokenTemplate>>(utils::generate_account_dtokens_key(
-        resource_id,
-        account,
-    ))
-    .unwrap()
 }
 
 fn check_caller() {
@@ -270,22 +264,22 @@ pub fn invoke() {
             ));
         }
         b"setAgents" => {
-            let (account, resource_id, agents, n) = source.read().unwrap();
-            sink.write(set_agents(account, resource_id, agents, n));
+            let (account, resource_id, agents, n, token_templates) = source.read().unwrap();
+            sink.write(set_agents(account, resource_id, agents, n, token_templates));
         }
         b"setTokenAgents" => {
-            let (account, resource_id, token_hash, agents, n) = source.read().unwrap();
+            let (account, resource_id, token_template, agents, n) = source.read().unwrap();
             sink.write(set_token_agents(
                 account,
                 resource_id,
-                token_hash,
+                token_template,
                 agents,
                 n,
             ));
         }
         b"addAgents" => {
-            let (account, resource_id, agents, n) = source.read().unwrap();
-            sink.write(add_agents(account, resource_id, agents, n));
+            let (account, resource_id, agents, n, token_templates) = source.read().unwrap();
+            sink.write(add_agents(account, resource_id, agents, n, token_templates));
         }
         b"addTokenAgents" => {
             let (account, resource_id, token_template, agents, n) = source.read().unwrap();
@@ -298,8 +292,8 @@ pub fn invoke() {
             ));
         }
         b"removeAgents" => {
-            let (account, resource_id, agents) = source.read().unwrap();
-            sink.write(remove_agents(account, resource_id, agents));
+            let (account, resource_id, agents, token_templates) = source.read().unwrap();
+            sink.write(remove_agents(account, resource_id, agents, token_templates));
         }
         b"removeTokenAgents" => {
             let (account, resource_id, token_template, agents): (
@@ -353,8 +347,5 @@ mod utils {
             agent.as_ref(),
         ]
         .concat()
-    }
-    pub fn generate_account_dtokens_key(resource_id: &[u8], account: &Address) -> Vec<u8> {
-        [KEY_AGENT, resource_id, account.as_ref()].concat()
     }
 }

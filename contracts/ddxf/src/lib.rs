@@ -24,6 +24,8 @@ const CRC32_SIZE: u32 = 4;
 
 const KEY_SELLER_ITEM_INFO: &[u8] = b"01";
 const KEY_SELLER_ITEM_SOLD: &[u8] = b"02";
+const DEFAULT_DTOKEN_CONTRACT_ADDRESS: Address =
+    ostd::macros::base58!("AbtTQJYKfQxq4UdygDsbLVjE8uRrJ2H3tP");
 
 fn dtoken_seller_publish(
     resource_id: &[u8],
@@ -34,7 +36,7 @@ fn dtoken_seller_publish(
     let resource =
         database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id));
     assert!(resource.is_none());
-    if &resource_ddo.endpoint == "" {
+    if resource_ddo.endpoint.is_empty() {
         assert_ne!(resource_ddo.token_endpoint.len(), 0);
         for token_template in item.templates.iter() {
             assert_ne!(resource_ddo.token_endpoint.get(token_template).unwrap(), "");
@@ -59,16 +61,15 @@ fn dtoken_seller_publish(
             }
         }
     }
-
     if item.templates.len() > 1 {
         assert!(resource_ddo.desc_hash.is_some())
     }
     let seller = SellerItemInfo::new(item.clone(), resource_ddo.clone());
     database::put(utils::generate_seller_item_info_key(resource_id), seller);
     let mut sink = Sink::new(16);
-    resource_ddo.encode(&mut sink);
+    sink.write(resource_ddo);
     let mut sink2 = Sink::new(16);
-    (*item).encode(&mut sink2);
+    sink2.write(item);
     events::dtoken_seller_publish_event(resource_id, sink.bytes(), sink2.bytes());
     true
 }
@@ -84,7 +85,6 @@ fn buy_dtoken_from_reseller(
         database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
             .unwrap();
     assert!(transfer_fee(
-        &item_info.resource_ddo.dtoken_contract_address,
         buyer_account,
         reseller_account,
         item_info.resource_ddo.mp_contract_address,
@@ -103,6 +103,15 @@ fn buy_dtoken_from_reseller(
     true
 }
 
+fn buy_dtokens(resource_ids: Vec<&[u8]>, ns: Vec<U128>, buyer_account: &Address) -> bool {
+    let l = resource_ids.len();
+    assert_eq!(l, ns.len());
+    for i in 0..l {
+        assert!(buy_dtoken(resource_ids[i], ns[i], buyer_account));
+    }
+    true
+}
+
 fn buy_dtoken(resource_id: &[u8], n: U128, buyer_account: &Address) -> bool {
     assert!(runtime::check_witness(buyer_account));
     let item_info =
@@ -116,7 +125,6 @@ fn buy_dtoken(resource_id: &[u8], n: U128, buyer_account: &Address) -> bool {
     let sum = sold.checked_add(n).unwrap();
     assert!(sum <= item_info.item.stocks as U128);
     assert!(transfer_fee(
-        &item_info.resource_ddo.dtoken_contract_address,
         buyer_account,
         &item_info.resource_ddo.manager,
         item_info.resource_ddo.mp_contract_address.clone(),
@@ -193,6 +201,7 @@ fn set_dtoken_agents(
         resource_id,
         agents,
         n,
+        &item_info.item.templates,
     );
     true
 }
@@ -212,7 +221,8 @@ fn add_dtoken_agents(
         account,
         resource_id,
         agents,
-        n
+        n,
+        &item_info.item.templates
     ));
     true
 }
@@ -248,12 +258,12 @@ fn remove_dtoken_agents(resource_id: &[u8], account: &Address, agents: Vec<&Addr
         &item_info.resource_ddo.dtoken_contract_address,
         account,
         resource_id,
-        agents
+        agents,
+        &item_info.item.templates
     ));
     true
 }
 fn transfer_fee(
-    contract_address: &Address,
     buyer_account: &Address,
     seller_account: &Address,
     mp_contract_address: Option<Address>,
@@ -308,6 +318,9 @@ fn transfer_inner(
             let contract_address = contract_addr.unwrap();
             let res =
                 wasm::call_contract(&contract_address, ("transfer", (from, to, amt))).unwrap();
+            let mut source = Source::new(&res);
+            let r: bool = source.read().unwrap();
+            assert!(r);
         }
     }
     true
