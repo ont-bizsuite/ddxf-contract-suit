@@ -2,10 +2,8 @@
 #![feature(proc_macro_hygiene)]
 extern crate alloc;
 extern crate ontio_std as ostd;
-use alloc::collections::btree_map::BTreeMap;
 use ostd::abi::{Decoder, Encoder, Error, Sink, Source};
 use ostd::database;
-use ostd::prelude::H256;
 use ostd::prelude::*;
 use ostd::runtime::{address, check_witness, input, ret};
 use ostd::types::{Address, U128};
@@ -15,17 +13,17 @@ use utils::*;
 mod basic;
 use basic::*;
 
+const MAX_PERCENTAGE: U128 = 10000;
 const ADMIN: Address = ostd::macros::base58!("AbtTQJYKfQxq4UdygDsbLVjE8uRrJ2H3tP");
-const DECIMAL: U128 = 1000000000;
-const MAX_PERCENTAGE: u16 = 10000;
 
 fn set_mp(mp_account: &Address) -> bool {
+    assert!(check_witness(&ADMIN));
     database::put(utils::KEY_MP, mp_account);
     true
 }
 
 fn set_fee_split_model(seller_acc: &Address, fee_split_model: FeeSplitModel) -> bool {
-    assert!(fee_split_model.percentage <= MAX_PERCENTAGE);
+    assert!(fee_split_model.percentage <= MAX_PERCENTAGE as u16);
     let mp = get_mp_account();
     assert!(check_witness(seller_acc) && check_witness(&mp));
     let mp = database::get::<_, Address>(KEY_MP).unwrap();
@@ -74,7 +72,7 @@ fn settle(seller_acc: &Address) -> bool {
     let mp = get_mp_account();
     let tokens = vec![TokenType::ONG, TokenType::ONT, TokenType::OEP4];
     for token in tokens.iter() {
-        let balance = balance_of(seller_acc, &TokenType::ONG);
+        let balance = balance_of(seller_acc, token);
         if balance.balance != 0 {
             assert!(settle_inner(seller_acc, &self_addr, &mp, balance));
         }
@@ -93,10 +91,19 @@ fn settle_inner(
         .balance
         .checked_mul(fee_split.percentage as U128)
         .unwrap();
+    let mp_amt = fee.checked_div(MAX_PERCENTAGE).unwrap();
     assert!(transfer(
         &self_addr,
         &mp,
-        fee,
+        mp_amt,
+        &balance.token_type,
+        balance.contract_address
+    ));
+    let seller_amt = balance.balance.checked_sub(mp_amt).unwrap();
+    assert!(transfer(
+        &self_addr,
+        seller_acc,
+        seller_amt,
         &balance.token_type,
         balance.contract_address
     ));
@@ -122,6 +129,9 @@ fn transfer(
             let contract_address = contract_addr.unwrap();
             let res =
                 wasm::call_contract(&contract_address, ("transfer", (from, to, amt))).unwrap();
+            let mut source = Source::new(&res);
+            let b: bool = source.read().unwrap();
+            assert!(b);
         }
     }
     true
@@ -157,6 +167,10 @@ pub fn invoke() {
         b"settle" => {
             let seller_acc = source.read().unwrap();
             sink.write(settle(seller_acc));
+        }
+        b"set_mp" => {
+            let mp_addr = source.read().unwrap();
+            sink.write(set_mp(mp_addr));
         }
         b"get_mp_account" => {
             sink.write(get_mp_account());
