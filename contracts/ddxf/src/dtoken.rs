@@ -1,8 +1,5 @@
-use super::ostd::abi::VmValueBuilder;
-use super::ostd::contract::{neo, wasm};
-use super::ostd::runtime;
-use super::BTreeMap;
-use super::{Address, Sink, String, Vec, H256, U128};
+use super::ostd::contract::wasm;
+use super::{Address, Sink, Vec, U128};
 use common::TokenTemplate;
 
 pub fn remove_agents(
