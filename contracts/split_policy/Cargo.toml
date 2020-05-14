@@ -9,7 +9,7 @@ edition = "2018"
 crate-type = ["cdylib"] #Compile as a dynamic link library
 
 [dependencies]
-ontio-std = {path="/Users/sss/dev/dockerData/rust_project/ontio-cdk-1/ontio-std"}
-
+#ontio-std = {path="/Users/sss/dev/dockerData/rust_project/ontio-cdk-1/ontio-std"}
+ontio-std = {git = "https://github.com/lucas7788/ontio-cdk-1.git", branch="update_event"}
 [features]
 mock = ["ontio-std/mock"]

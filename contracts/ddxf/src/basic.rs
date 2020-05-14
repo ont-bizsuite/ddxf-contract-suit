@@ -1,6 +1,6 @@
 use super::ostd::abi::{Decoder, Encoder, Error, Sink, Source};
 use super::ostd::prelude::*;
-use super::ostd::types::{Address, H256, U128};
+use super::ostd::types::{Address, H256};
 use super::BTreeMap;
 use super::String;
 use common::TokenTemplate;
