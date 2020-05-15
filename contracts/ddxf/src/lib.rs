@@ -402,11 +402,11 @@ pub fn invoke() {
                 reseller_account,
             ));
         }
-        b"buy_dtokens" => {
+        b"buyDtokens" => {
             let (resource_ids, ns, buyer) = source.read().unwrap();
             sink.write(buy_dtokens(resource_ids, ns, buyer));
         }
-        b"buy_dtokens_and_set_agents" => {
+        b"buyDtokensAndSetAgents" => {
             let (
                 resource_ids,
                 ns,
@@ -468,7 +468,7 @@ pub fn invoke() {
             let (resource_id, account, agents) = source.read().unwrap();
             sink.write(remove_agents(resource_id, account, agents));
         }
-        b"remove_token_agents" => {
+        b"removeTokenAgents" => {
             let (resource_id, template_bytes, account, agents) = source.read().unwrap();
             sink.write(remove_token_agents(
                 resource_id,
