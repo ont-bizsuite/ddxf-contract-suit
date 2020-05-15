@@ -214,14 +214,14 @@ fn set_agents(resource_id: &[u8], account: &Address, agents: Vec<&Address>, n: U
     let item_info =
         database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
             .unwrap();
-    set_agents_dtoken(
+    assert!(set_agents_dtoken(
         &item_info.resource_ddo.dtoken_contract_address,
         account,
         resource_id,
         agents,
         n,
         &item_info.item.get_templates_bytes(),
-    );
+    ));
     true
 }
 
@@ -236,14 +236,14 @@ fn set_token_agents(
     let item_info =
         database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
             .unwrap();
-    set_token_agents_dtoken(
+    assert!(set_token_agents_dtoken(
         &item_info.resource_ddo.dtoken_contract_address,
         account,
         resource_id,
         &template_bytes,
         agents,
         n,
-    );
+    ));
     true
 }
 

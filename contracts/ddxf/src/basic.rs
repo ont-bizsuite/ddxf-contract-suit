@@ -79,7 +79,7 @@ impl<'a> Decoder<'a> for ResourceDDO {
         let l: u32 = source.read()?;
         let mut token_resource_type: BTreeMap<TokenTemplate, RT> = BTreeMap::new();
         for _ in 0..l {
-            let (k, v) = source.read()?;
+            let (k, v) = source.read().unwrap();
             token_resource_type.insert(k, v);
         }
         let manager: Address = source.read().unwrap();
