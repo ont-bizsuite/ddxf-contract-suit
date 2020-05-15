@@ -432,11 +432,11 @@ pub fn invoke() {
             let (resource_id, n, buyer_account) = source.read().unwrap();
             sink.write(buy_dtoken(resource_id, n, buyer_account));
         }
-        b"useDtoken" => {
+        b"useToken" => {
             let (resource_id, account, token_template, n) = source.read().unwrap();
             sink.write(use_token(resource_id, account, token_template, n));
         }
-        b"useDtokenByAgent" => {
+        b"useTokenByAgent" => {
             let (resource_id, account, agent, token_template, n) = source.read().unwrap();
             sink.write(use_token_by_agent(
                 resource_id,
