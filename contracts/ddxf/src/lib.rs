@@ -115,8 +115,8 @@ fn buy_dtokens_and_set_agents(
     ns: Vec<U128>,
     use_index: U128,
     authorized_index: U128,
-    authorized_token_hash: Vec<u8>,
-    use_token_hash: Vec<u8>,
+    authorized_token_template_bytes: &[u8],
+    use_template_bytes: &[u8],
     buyer_account: &Address,
     agent: &Address,
 ) -> bool {
@@ -129,13 +129,13 @@ fn buy_dtokens_and_set_agents(
         resource_ids[authorized_index as usize],
         buyer_account,
         vec![agent],
-        &TokenTemplate::new(None, authorized_token_hash).to_bytes(),
+        authorized_token_template_bytes,
         ns[authorized_index as usize],
     ));
     assert!(use_token(
         resource_ids[use_index as usize],
         buyer_account,
-        &TokenTemplate::new(None, use_token_hash).to_bytes(),
+        use_template_bytes,
         ns[use_index as usize]
     ));
     true
@@ -412,8 +412,8 @@ pub fn invoke() {
                 ns,
                 use_index,
                 authorized_index,
-                authorized_token_hash,
-                use_token_hash,
+                authorized_token_template_bytes,
+                use_template_bytes,
                 buyer,
                 agent,
             ) = source.read().unwrap();
@@ -422,8 +422,8 @@ pub fn invoke() {
                 ns,
                 use_index,
                 authorized_index,
-                authorized_token_hash,
-                use_token_hash,
+                authorized_token_template_bytes,
+                use_template_bytes,
                 buyer,
                 agent,
             ));
@@ -432,11 +432,11 @@ pub fn invoke() {
             let (resource_id, n, buyer_account) = source.read().unwrap();
             sink.write(buy_dtoken(resource_id, n, buyer_account));
         }
-        b"useToken" => {
+        b"useDtoken" => {
             let (resource_id, account, token_template, n) = source.read().unwrap();
             sink.write(use_token(resource_id, account, token_template, n));
         }
-        b"useTokenByAgent" => {
+        b"useDtokenByAgent" => {
             let (resource_id, account, agent, token_template, n) = source.read().unwrap();
             sink.write(use_token_by_agent(
                 resource_id,
@@ -455,11 +455,11 @@ pub fn invoke() {
             sink.write(add_agents(resource_id, account, agents, n));
         }
         b"addTokenAgents" => {
-            let (resource_id, account, token_hash, agents, n) = source.read().unwrap();
+            let (resource_id, account, token_template_bytes, agents, n) = source.read().unwrap();
             sink.write(add_token_agents(
                 resource_id,
                 account,
-                token_hash,
+                token_template_bytes,
                 agents,
                 n,
             ));
