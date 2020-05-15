@@ -402,6 +402,32 @@ pub fn invoke() {
                 reseller_account,
             ));
         }
+        b"buy_dtokens" => {
+            let (resource_ids, ns, buyer) = source.read().unwrap();
+            sink.write(buy_dtokens(resource_ids, ns, buyer));
+        }
+        b"buy_dtokens_and_set_agents" => {
+            let (
+                resource_ids,
+                ns,
+                use_index,
+                authorized_index,
+                authorized_token_hash,
+                use_token_hash,
+                buyer,
+                agent,
+            ) = source.read().unwrap();
+            sink.write(buy_dtokens_and_set_agents(
+                resource_ids,
+                ns,
+                use_index,
+                authorized_index,
+                authorized_token_hash,
+                use_token_hash,
+                buyer,
+                agent,
+            ));
+        }
         b"buyDtoken" => {
             let (resource_id, n, buyer_account) = source.read().unwrap();
             sink.write(buy_dtoken(resource_id, n, buyer_account));
@@ -420,11 +446,11 @@ pub fn invoke() {
                 n,
             ));
         }
-        b"setDtokenAgents" => {
+        b"setAgents" => {
             let (resource_id, account, agents, n) = source.read().unwrap();
             sink.write(set_agents(resource_id, account, agents, n));
         }
-        b"addDtokenAgents" => {
+        b"addAgents" => {
             let (resource_id, account, agents, n) = source.read().unwrap();
             sink.write(add_agents(resource_id, account, agents, n));
         }
@@ -438,9 +464,18 @@ pub fn invoke() {
                 n,
             ));
         }
-        b"removeDtokenAgents" => {
+        b"removeAgents" => {
             let (resource_id, account, agents) = source.read().unwrap();
             sink.write(remove_agents(resource_id, account, agents));
+        }
+        b"remove_token_agents" => {
+            let (resource_id, template_bytes, account, agents) = source.read().unwrap();
+            sink.write(remove_token_agents(
+                resource_id,
+                template_bytes,
+                account,
+                agents,
+            ));
         }
         _ => {
             let method = str::from_utf8(action).ok().unwrap();
@@ -463,6 +498,21 @@ mod events {
         reseller_account: &Address,
     ) {
     }
+    #[event(buyDtoken)]
+    pub fn buy_dtoken(resource_id: &[u8], n: U128, buyer_account: &Address) {}
+    #[event(useToken)]
+    pub fn use_token(resource_id: &[u8], account: &Address, token_template_bytes: &[u8], n: U128) {}
+    #[event(useTokenByAgent)]
+    pub fn use_token_by_agent(
+        resource_id: &[u8],
+        account: &Address,
+        agent: &Address,
+        token_template_bytes: &[u8],
+        n: U128,
+    ) {
+    }
+    #[event(setDtokenAgents)]
+    pub fn set_agents(resource_id: &[u8], account: &Address, n: U128) {}
 }
 
 mod utils {
