@@ -39,6 +39,7 @@ use super::BTreeMap;
 //    }
 //}
 
+#[derive(Clone)]
 pub struct CountAndAgent {
     pub count: u32,
     pub agents: BTreeMap<Address, u32>,
@@ -46,8 +47,7 @@ pub struct CountAndAgent {
 
 impl CountAndAgent {
     pub fn new(addr: Address) -> Self {
-        let mut agents: BTreeMap<Address, u32> = BTreeMap::new();
-        agents.insert(addr, 0);
+        let agents: BTreeMap<Address, u32> = BTreeMap::new();
         CountAndAgent { count: 0, agents }
     }
 

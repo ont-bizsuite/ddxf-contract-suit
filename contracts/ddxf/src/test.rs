@@ -1,15 +1,78 @@
 use super::*;
 use hexutil::to_hex;
+use hexutil::{read_hex, to_hex};
 use ostd::abi::{Decoder, Encoder};
 use ostd::mock::build_runtime;
 use ostd::mock::contract_mock::Command;
+use ostd::prelude::String;
+
+#[test]
+fn test() {
+    let data = read_hex("0e746573745265736f757263654964f20001000000012a6469643a6f6e743a41626b35725255794a53636e6d5045645264567934693769666955377967433853682096cae35ce8a9b0244178bf28e4966c2ce1b8385723a96a6b838858cdd6ca0a1e00675478ea7368fd9579c00a8a749d29c2b82f2aef10687474703a2f2f64656d6f2e7465737401000000012a6469643a6f6e743a41626b35725255794a53636e6d5045645264567934693769666955377967433853682096cae35ce8a9b0244178bf28e4966c2ce1b8385723a96a6b838858cdd6ca0a1e10687474703a2f2f64656d6f2e7465737400012fee6d8699c9b8f992a6bd54753cf84cb3aae87400002d000000000000000000000000000000000000000201c80000000000000000943577000000006400000000000000").unwrap_or_default();
+    let mut source = Source::new(&data);
+    let (resource_id, ddo_bytes, item_bytes): (Vec<u8>, &[u8], &[u8]) = source.read().unwrap();
+    println!("resource_id:{:?}", String::from_utf8(resource_id));
+    let ddo = ResourceDDO::from_bytes(ddo_bytes);
+    println!("ddo:{:?}", ddo.manager);
+    let item = DTokenItem::from_bytes(item_bytes);
+    println!("item:{:?}", item.expired_date);
+}
+
+#[test]
+fn test2() {
+    let data = read_hex("0001000000012a6469643a6f6e743a41626b35725255794a53636e6d5045645264567934693769666955377967433853682096cae35ce8a9b0244178bf28e4966c2ce1b8385723a96a6b838858cdd6ca0a1e00675478ea7368fd9579c00a8a749d29c2b82f2aef10687474703a2f2f64656d6f2e7465737401000000012a6469643a6f6e743a41626b35725255794a53636e6d5045645264567934693769666955377967433853682096cae35ce8a9b0244178bf28e4966c2ce1b8385723a96a6b838858cdd6ca0a1e10687474703a2f2f64656d6f2e7465737400012fee6d8699c9b8f992a6bd54753cf84cb3aae8740000").unwrap_or_default();
+    let ddo = ResourceDDO::from_bytes(&data);
+    println!("{}", ddo.manager);
+}
+
+#[test]
+fn serialize() {
+    let mut bmap: BTreeMap<TokenTemplate, RT> = BTreeMap::new();
+    let token_hash = read_hex("96cae35ce8a9b0244178bf28e4966c2ce1b8385723a96a6b838858cdd6ca0a1e")
+        .unwrap_or_default();
+    let token_template = TokenTemplate::new(
+        Some(b"did:ont:Abk5rRUyJScnmPEdRdVy4i7ifiU7ygC8Sh".to_vec()),
+        token_hash,
+    );
+    bmap.insert(token_template.clone(), RT::RTStaticFile);
+
+    let mut token_endpoint = BTreeMap::new();
+    token_endpoint.insert(token_template.clone(), "http://demo.test".to_string());
+    let manager = ostd::macros::base58!("ARCESVnP8Lbf6S7FuTei3smA35EQYog4LR");
+
+    let mp_contract_address = Address::repeat_byte(3);
+
+    let dtoken_contract_hex =
+        read_hex("2fee6d8699c9b8f992a6bd54753cf84cb3aae874").unwrap_or_default();
+    let mut temp: [u8; 20] = [0; 20];
+    for i in 0..20 {
+        temp[i] = dtoken_contract_hex[i]
+    }
+    let dtoken_contract = Address::new(temp);
+    let ddo = ResourceDDO {
+        resource_type: RT::RTStaticFile,
+        token_resource_type: bmap,
+        manager: manager.clone(),
+        endpoint: "endpoint".to_string(),
+        token_endpoint,
+        desc_hash: None,
+        dtoken_contract_address: Some(dtoken_contract.clone()),
+        mp_contract_address: None,
+        split_policy_contract_address: None,
+    };
+
+    let mut sink = Sink::new(16);
+    sink.write(ddo);
+    println!("{}", to_hex(sink.bytes()));
+    panic!("");
+}
 
 #[test]
 fn publish() {
     let resource_id = b"resource_id";
     let mut bmap: BTreeMap<TokenTemplate, RT> = BTreeMap::new();
     let temp = vec![0u8; 36];
-    let token_template = TokenTemplate::new(temp);
+    let token_template = TokenTemplate::new(None, temp);
     bmap.insert(token_template.clone(), RT::RTStaticFile);
 
     let manager = Address::repeat_byte(1);
@@ -23,7 +86,7 @@ fn publish() {
         endpoint: "endpoint".to_string(),
         token_endpoint: BTreeMap::new(),
         desc_hash: None,
-        dtoken_contract_address: dtoken_contract_address.clone(),
+        dtoken_contract_address: Some(dtoken_contract_address.clone()),
         mp_contract_address: None,
         split_policy_contract_address: None,
     };
@@ -44,7 +107,11 @@ fn publish() {
 
     let handle = build_runtime();
     handle.witness(&[manager.clone()]);
-    assert!(dtoken_seller_publish(resource_id, &ddo, &dtoken_item));
+    assert!(dtoken_seller_publish(
+        resource_id,
+        &ddo.to_bytes(),
+        &dtoken_item.to_bytes()
+    ));
 
     let buyer = Address::repeat_byte(4);
 

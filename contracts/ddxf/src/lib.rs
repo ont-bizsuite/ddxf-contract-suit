@@ -25,13 +25,11 @@ const CRC32_SIZE: u32 = 4;
 const KEY_SELLER_ITEM_INFO: &[u8] = b"01";
 const KEY_SELLER_ITEM_SOLD: &[u8] = b"02";
 const DEFAULT_DTOKEN_CONTRACT_ADDRESS: Address =
-    ostd::macros::base58!("AbtTQJYKfQxq4UdygDsbLVjE8uRrJ2H3tP");
+    ostd::macros::base58!("AZCf8WocqHmHmAcieVgpaeNbH9TeULg61v");
 
-fn dtoken_seller_publish(
-    resource_id: &[u8],
-    resource_ddo: &ResourceDDO,
-    item: &DTokenItem,
-) -> bool {
+fn dtoken_seller_publish(resource_id: &[u8], resource_ddo_bytes: &[u8], item_bytes: &[u8]) -> bool {
+    let resource_ddo = ResourceDDO::from_bytes(resource_ddo_bytes);
+    let item = DTokenItem::from_bytes(item_bytes);
     assert!(runtime::check_witness(&resource_ddo.manager));
     let resource =
         database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id));
@@ -97,7 +95,7 @@ fn buy_dtoken_from_reseller(
         reseller_account,
         buyer_account,
         resource_id,
-        &item_info.item.templates,
+        &item_info.item.get_templates_bytes(),
         n
     ));
     true
@@ -131,13 +129,13 @@ fn buy_dtokens_and_set_agents(
         resource_ids[authorized_index as usize],
         buyer_account,
         vec![agent],
-        TokenTemplate::new(authorized_token_hash),
+        &TokenTemplate::new(None, authorized_token_hash).to_bytes(),
         ns[authorized_index as usize],
     ));
     assert!(use_token(
         resource_ids[use_index as usize],
         buyer_account,
-        TokenTemplate::new(use_token_hash),
+        &TokenTemplate::new(None, use_token_hash).to_bytes(),
         ns[use_index as usize]
     ));
     true
@@ -168,18 +166,13 @@ fn buy_dtoken(resource_id: &[u8], n: U128, buyer_account: &Address) -> bool {
         &item_info.resource_ddo.dtoken_contract_address,
         buyer_account,
         resource_id,
-        &item_info.item.templates,
+        &item_info.item.get_templates_bytes(),
         n
     ));
     true
 }
 
-fn use_token(
-    resource_id: &[u8],
-    account: &Address,
-    token_template: TokenTemplate,
-    n: U128,
-) -> bool {
+fn use_token(resource_id: &[u8], account: &Address, token_template_bytes: &[u8], n: U128) -> bool {
     assert!(runtime::check_witness(account));
     let item_info =
         database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
@@ -188,7 +181,7 @@ fn use_token(
         &item_info.resource_ddo.dtoken_contract_address,
         account,
         resource_id,
-        token_template,
+        token_template_bytes,
         n
     ));
     true
@@ -198,7 +191,7 @@ fn use_token_by_agent(
     resource_id: &[u8],
     account: &Address,
     agent: &Address,
-    token_template: TokenTemplate,
+    token_template_bytes: &[u8],
     n: U128,
 ) -> bool {
     assert!(runtime::check_witness(agent));
@@ -210,7 +203,7 @@ fn use_token_by_agent(
         account,
         agent,
         resource_id,
-        token_template,
+        token_template_bytes,
         n
     ));
     true
@@ -227,7 +220,7 @@ fn set_agents(resource_id: &[u8], account: &Address, agents: Vec<&Address>, n: U
         resource_id,
         agents,
         n,
-        &item_info.item.templates,
+        &item_info.item.get_templates_bytes(),
     );
     true
 }
@@ -236,7 +229,7 @@ fn set_token_agents(
     resource_id: &[u8],
     account: &Address,
     agents: Vec<&Address>,
-    template: TokenTemplate,
+    template_bytes: &[u8],
     n: U128,
 ) -> bool {
     assert!(runtime::check_witness(account));
@@ -247,7 +240,7 @@ fn set_token_agents(
         &item_info.resource_ddo.dtoken_contract_address,
         account,
         resource_id,
-        template,
+        &template_bytes,
         agents,
         n,
     );
@@ -265,7 +258,7 @@ fn add_agents(resource_id: &[u8], account: &Address, agents: Vec<&Address>, n: U
         resource_id,
         agents,
         n,
-        &item_info.item.templates
+        &item_info.item.get_templates_bytes()
     ));
     true
 }
@@ -273,7 +266,7 @@ fn add_agents(resource_id: &[u8], account: &Address, agents: Vec<&Address>, n: U
 fn add_token_agents(
     resource_id: &[u8],
     account: &Address,
-    token_hash: &[u8],
+    token_template_bytes: &[u8],
     agents: Vec<&Address>,
     n: U128,
 ) -> bool {
@@ -285,7 +278,7 @@ fn add_token_agents(
         &item_info.resource_ddo.dtoken_contract_address,
         account,
         resource_id,
-        token_hash,
+        token_template_bytes,
         agents,
         n
     ));
@@ -302,14 +295,14 @@ fn remove_agents(resource_id: &[u8], account: &Address, agents: Vec<&Address>) -
         account,
         resource_id,
         agents,
-        &item_info.item.templates
+        &item_info.item.get_templates_bytes()
     ));
     true
 }
 
 fn remove_token_agents(
     resource_id: &[u8],
-    token_template: TokenTemplate,
+    token_template_bytes: &[u8],
     account: &Address,
     agents: Vec<&Address>,
 ) -> bool {
@@ -321,7 +314,7 @@ fn remove_token_agents(
         &item_info.resource_ddo.dtoken_contract_address,
         account,
         resource_id,
-        token_template,
+        token_template_bytes,
         agents,
     ));
     true
@@ -398,7 +391,7 @@ pub fn invoke() {
     match action {
         b"dtokenSellerPublish" => {
             let (resource_id, resource_ddo, item) = source.read().unwrap();
-            sink.write(dtoken_seller_publish(resource_id, &resource_ddo, &item));
+            sink.write(dtoken_seller_publish(resource_id, resource_ddo, item));
         }
         b"buyDtokenFromReseller" => {
             let (resource_id, n, buyer_account, reseller_account) = source.read().unwrap();
@@ -451,7 +444,7 @@ pub fn invoke() {
         }
         _ => {
             let method = str::from_utf8(action).ok().unwrap();
-            panic!("not support method:{}", method)
+            panic!("ddxf contract, not support method:{}", method)
         }
     }
     runtime::ret(sink.bytes());

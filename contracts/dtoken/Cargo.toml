@@ -13,5 +13,9 @@ ontio-std = {git = "https://github.com/lucas7788/ontio-cdk-1.git", branch="updat
 #ontio-std = {path="/Users/sss/dev/dockerData/rust_project/ontio-cdk-1/ontio-std"}
 common = {path="../../common"}
 
+[dev-dependencies]
+etcommon-hexutil = { version = "0.2.4", default-features = false }
+
+
 [features]
 mock = ["ontio-std/mock"]

@@ -18,6 +18,18 @@ pub struct ResourceDDO {
     pub split_policy_contract_address: Option<Address>,   //can be empty
 }
 
+impl ResourceDDO {
+    pub fn from_bytes(data: &[u8]) -> Self {
+        let mut source = Source::new(data);
+        source.read().unwrap()
+    }
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut sink = Sink::new(16);
+        sink.write(self);
+        sink.bytes().to_vec()
+    }
+}
+
 impl<'a> Encoder for ResourceDDO {
     fn encode(&self, sink: &mut Sink) {
         sink.write(self.resource_type.clone());
@@ -42,7 +54,7 @@ impl<'a> Encoder for ResourceDDO {
         }
         if let Some(addr) = &self.dtoken_contract_address {
             sink.write(true);
-            sink.write(&self.dtoken_contract_address);
+            sink.write(addr);
         } else {
             sink.write(false);
         }
@@ -79,30 +91,33 @@ impl<'a> Decoder<'a> for ResourceDDO {
             let v: String = source.read().unwrap();
             bmap.insert(k, v);
         }
-        let is: bool = source.read()?;
-        let desc_hash = match is {
+        let is_desc_hash: bool = source.read().unwrap();
+        let desc_hash = match is_desc_hash {
             true => {
-                let temp: H256 = source.read()?;
+                let temp: H256 = source.read().unwrap();
                 Some(temp)
             }
             false => None,
         };
-        let is: bool = source.read()?;
-        let dtoken_contract_address = match is {
-            true => source.read()?,
+        let is_dtoken_contract_address: bool = source.read().unwrap();
+        let dtoken_contract_address: Option<Address> = match is_dtoken_contract_address {
+            true => {
+                let temp: Address = source.read()?;
+                Some(temp)
+            }
             false => None,
         };
 
-        let is_val: bool = source.read()?;
-        let mp_contract_address = match is_val {
+        let is_mp: bool = source.read().unwrap();
+        let mp_contract_address = match is_mp {
             true => {
                 let addr: Address = source.read()?;
                 Some(addr)
             }
             false => None,
         };
-        let is_val: bool = source.read()?;
-        let split_policy_contract_address = match is_val {
+        let is_split: bool = source.read().unwrap();
+        let split_policy_contract_address = match is_split {
             true => {
                 let addr: Address = source.read()?;
                 Some(addr)
@@ -167,6 +182,26 @@ pub struct DTokenItem {
     pub stocks: u32,
     pub templates: Vec<TokenTemplate>,
 }
+
+impl DTokenItem {
+    pub fn get_templates_bytes(&self) -> Vec<u8> {
+        let mut sink = Sink::new(16);
+        sink.write(&self.templates);
+        sink.bytes().to_vec()
+    }
+
+    pub fn from_bytes(data: &[u8]) -> Self {
+        let mut source = Source::new(data);
+        source.read().unwrap()
+    }
+
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut sink = Sink::new(16);
+        sink.write(self);
+        sink.bytes().to_vec()
+    }
+}
+
 impl Encoder for DTokenItem {
     fn encode(&self, sink: &mut Sink) {
         sink.write(&self.fee);

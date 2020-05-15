@@ -12,6 +12,19 @@ pub struct TokenTemplate {
     pub token_hash: Vec<u8>,
 }
 
+impl TokenTemplate {
+    pub fn from_bytes(data: &[u8]) -> Self {
+        let mut source = Source::new(data);
+        source.read().unwrap()
+    }
+
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut sink = Sink::new(16);
+        sink.write(self);
+        sink.bytes().to_vec()
+    }
+}
+
 impl Encoder for TokenTemplate {
     fn encode(&self, sink: &mut Sink) {
         if let Some(data_ids) = &self.data_ids {
@@ -43,9 +56,9 @@ impl<'a> Decoder<'a> for TokenTemplate {
 }
 
 impl TokenTemplate {
-    pub fn new(token_hash: Vec<u8>) -> Self {
+    pub fn new(data_ids: Option<Vec<u8>>, token_hash: Vec<u8>) -> Self {
         TokenTemplate {
-            data_ids: None,
+            data_ids,
             token_hash,
         }
     }
