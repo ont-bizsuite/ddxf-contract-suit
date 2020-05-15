@@ -18,6 +18,28 @@ fn test() {
 }
 
 #[test]
+fn dtoken_test() {
+    let addr = Address::repeat_byte(1);
+    let item = DTokenItem {
+        fee: Fee {
+            contract_addr: addr,
+            contract_type: TokenType::ONG,
+            count: 1000000,
+        },
+        expired_date: 10000,
+        stocks: 1000,
+        templates: vec![TokenTemplate::new(None, vec![1u8; 32])],
+    };
+
+    let mut sink = Sink::new(16);
+    sink.write(&item);
+
+    let mut source = Source::new(sink.bytes());
+    let item2: DTokenItem = source.read().unwrap();
+    assert_eq!(item.stocks, item2.stocks);
+}
+
+#[test]
 fn test2() {
     let data = read_hex("0001000000012a6469643a6f6e743a41626b35725255794a53636e6d5045645264567934693769666955377967433853682096cae35ce8a9b0244178bf28e4966c2ce1b8385723a96a6b838858cdd6ca0a1e00675478ea7368fd9579c00a8a749d29c2b82f2aef10687474703a2f2f64656d6f2e7465737401000000012a6469643a6f6e743a41626b35725255794a53636e6d5045645264567934693769666955377967433853682096cae35ce8a9b0244178bf28e4966c2ce1b8385723a96a6b838858cdd6ca0a1e10687474703a2f2f64656d6f2e7465737400012fee6d8699c9b8f992a6bd54753cf84cb3aae8740000").unwrap_or_default();
     let ddo = ResourceDDO::from_bytes(&data);

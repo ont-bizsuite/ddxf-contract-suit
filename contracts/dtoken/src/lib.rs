@@ -22,7 +22,12 @@ const KEY_ACCOUNT_DTOKENS: &[u8] = b"03";
 
 const DDXF_CONTRACT_ADDRESS: Address = ostd::macros::base58!("AbtTQJYKfQxq4UdygDsbLVjE8uRrJ2H3tP");
 
-fn generate_dtoken(account: &Address, resource_id: &[u8], templates_bytes: &[u8], n: U128) -> bool {
+pub fn generate_dtoken(
+    account: &Address,
+    resource_id: &[u8],
+    templates_bytes: &[u8],
+    n: U128,
+) -> bool {
     let mut source = Source::new(templates_bytes);
     let templates: Vec<TokenTemplate> = source.read().unwrap();
     check_caller();
@@ -41,7 +46,12 @@ fn generate_dtoken(account: &Address, resource_id: &[u8], templates_bytes: &[u8]
     true
 }
 
-fn use_token(account: &Address, resource_id: &[u8], token_template_bytes: &[u8], n: U128) -> bool {
+pub fn use_token(
+    account: &Address,
+    resource_id: &[u8],
+    token_template_bytes: &[u8],
+    n: U128,
+) -> bool {
     check_caller();
     let mut caa = get_count_and_agent(resource_id, account, token_template_bytes);
     assert!(caa.count >= n as u32);
@@ -55,7 +65,7 @@ fn use_token(account: &Address, resource_id: &[u8], token_template_bytes: &[u8],
     true
 }
 
-fn use_token_by_agent(
+pub fn use_token_by_agent(
     account: &Address,
     agent: &Address,
     resource_id: &[u8],

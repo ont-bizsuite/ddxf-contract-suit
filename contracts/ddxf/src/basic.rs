@@ -175,7 +175,7 @@ impl SellerItemInfo {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Encoder, Decoder)]
 pub struct DTokenItem {
     pub fee: Fee,
     pub expired_date: u64,
@@ -202,34 +202,34 @@ impl DTokenItem {
     }
 }
 
-impl Encoder for DTokenItem {
-    fn encode(&self, sink: &mut Sink) {
-        sink.write(&self.fee);
-        sink.write(self.expired_date);
-        sink.write(self.stocks);
-        sink.write(self.templates.len() as u32);
-        for token in self.templates.iter() {
-            sink.write(token);
-        }
-    }
-}
-
-impl<'a> Decoder<'a> for DTokenItem {
-    fn decode(source: &mut Source<'a>) -> Result<Self, Error> {
-        let fee: Fee = source.read()?;
-        let expired_date: u64 = source.read()?;
-        let stocks: u32 = source.read()?;
-        let mut templates: Vec<TokenTemplate> = vec![];
-        let l: u32 = source.read()?;
-        for _ in 0..l {
-            let v = source.read()?;
-            templates.push(v);
-        }
-        Ok(DTokenItem {
-            fee,
-            expired_date,
-            stocks,
-            templates,
-        })
-    }
-}
+//impl Encoder for DTokenItem {
+//    fn encode(&self, sink: &mut Sink) {
+//        sink.write(&self.fee);
+//        sink.write(self.expired_date);
+//        sink.write(self.stocks);
+//        sink.write(self.templates.len() as u32);
+//        for token in self.templates.iter() {
+//            sink.write(token);
+//        }
+//    }
+//}
+//
+//impl<'a> Decoder<'a> for DTokenItem {
+//    fn decode(source: &mut Source<'a>) -> Result<Self, Error> {
+//        let fee: Fee = source.read()?;
+//        let expired_date: u64 = source.read()?;
+//        let stocks: u32 = source.read()?;
+//        let mut templates: Vec<TokenTemplate> = vec![];
+//        let l: u32 = source.read()?;
+//        for _ in 0..l {
+//            let v = source.read()?;
+//            templates.push(v);
+//        }
+//        Ok(DTokenItem {
+//            fee,
+//            expired_date,
+//            stocks,
+//            templates,
+//        })
+//    }
+//}
