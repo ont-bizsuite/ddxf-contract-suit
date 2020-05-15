@@ -91,7 +91,6 @@ fn serialize() {
     let mut sink = Sink::new(16);
     sink.write(ddo);
     println!("{}", to_hex(sink.bytes()));
-    panic!("");
 }
 
 #[test]
@@ -206,7 +205,7 @@ enum DtokenCommand {
 struct UseToken {
     account: Address,
     resource_id: Vec<u8>,
-    token_template: TokenTemplate,
+    token_template: Vec<u8>,
     n: U128,
 }
 
@@ -233,7 +232,6 @@ fn mock_dtoken_contract(
 ) -> Option<Vec<u8>> {
     let mut sink = Sink::new(12);
     let mut source = Source::new(_data);
-    println!("{}", to_hex(_data));
     let command = DtokenCommand::decode(&mut source).ok().unwrap();
     match command {
         DtokenCommand::GenerateDToken(generate) => {

@@ -3,7 +3,7 @@ use super::ostd::prelude::*;
 use super::ostd::types::{Address, H256};
 use super::BTreeMap;
 use super::String;
-use common::TokenTemplate;
+use common::{Fee, TokenTemplate, TokenType};
 
 #[derive(Clone)]
 pub struct ResourceDDO {
@@ -231,49 +231,5 @@ impl<'a> Decoder<'a> for DTokenItem {
             stocks,
             templates,
         })
-    }
-}
-
-#[derive(Encoder, Decoder, Clone)]
-pub struct Fee {
-    pub contract_addr: Address,
-    pub contract_type: TokenType,
-    pub count: u64,
-}
-
-#[derive(Clone)]
-pub enum TokenType {
-    ONT,
-    ONG,
-    OEP4,
-}
-
-impl Encoder for TokenType {
-    fn encode(&self, sink: &mut Sink) {
-        match self {
-            TokenType::ONT => {
-                sink.write(0u8);
-            }
-            TokenType::ONG => {
-                sink.write(1u8);
-            }
-            TokenType::OEP4 => {
-                sink.write(2u8);
-            }
-        }
-    }
-}
-
-impl<'a> Decoder<'a> for TokenType {
-    fn decode(source: &mut Source<'a>) -> Result<Self, Error> {
-        let ty: u8 = source.read().unwrap();
-        match ty {
-            0u8 => Ok(TokenType::ONT),
-            1u8 => Ok(TokenType::ONG),
-            2u8 => Ok(TokenType::OEP4),
-            _ => {
-                panic!("");
-            }
-        }
     }
 }
