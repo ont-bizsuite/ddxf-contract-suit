@@ -1,6 +1,6 @@
 use super::{Address, Decoder, Encoder, Error, Sink, Source, U128};
 
-#[derive(Encoder, Decoder)]
+#[derive(Encoder, Decoder, Clone)]
 pub struct FeeSplitModel {
     pub percentage: u16,
 }

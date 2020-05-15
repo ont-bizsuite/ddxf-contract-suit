@@ -12,6 +12,8 @@ use ostd::contract::{ong, ont, wasm};
 use utils::*;
 mod basic;
 use basic::*;
+#[cfg(test)]
+mod test;
 
 const MAX_PERCENTAGE: U128 = 10000;
 const ADMIN: Address = ostd::macros::base58!("AbtTQJYKfQxq4UdygDsbLVjE8uRrJ2H3tP");
@@ -76,6 +78,7 @@ fn settle(seller_acc: &Address) -> bool {
         if balance.balance != 0 {
             assert!(settle_inner(seller_acc, &self_addr, &mp, balance));
         }
+        database::delete(utils::generate_balance_key(seller_acc, token));
     }
     true
 }

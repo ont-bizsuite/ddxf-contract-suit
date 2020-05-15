@@ -1,5 +1,4 @@
 use super::*;
-use hexutil::to_hex;
 use hexutil::{read_hex, to_hex};
 use ostd::abi::{Decoder, Encoder};
 use ostd::mock::build_runtime;
@@ -23,6 +22,25 @@ fn test2() {
     let data = read_hex("0001000000012a6469643a6f6e743a41626b35725255794a53636e6d5045645264567934693769666955377967433853682096cae35ce8a9b0244178bf28e4966c2ce1b8385723a96a6b838858cdd6ca0a1e00675478ea7368fd9579c00a8a749d29c2b82f2aef10687474703a2f2f64656d6f2e7465737401000000012a6469643a6f6e743a41626b35725255794a53636e6d5045645264567934693769666955377967433853682096cae35ce8a9b0244178bf28e4966c2ce1b8385723a96a6b838858cdd6ca0a1e10687474703a2f2f64656d6f2e7465737400012fee6d8699c9b8f992a6bd54753cf84cb3aae8740000").unwrap_or_default();
     let ddo = ResourceDDO::from_bytes(&data);
     println!("{}", ddo.manager);
+}
+
+#[test]
+fn test3() {
+    let data = read_hex("1564746f6b656e5f73656c6c65725f7075626c6973680e746573745265736f757263654964f20001000000012a6469643a6f6e743a41626b35725255794a53636e6d504564526456793469376966695537796743385368208d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c9200675478ea7368fd9579c00a8a749d29c2b82f2aef10687474703a2f2f64656d6f2e7465737401000000012a6469643a6f6e743a41626b35725255794a53636e6d504564526456793469376966695537796743385368208d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c9210687474703a2f2f64656d6f2e7465737400016a0f57363384aa6a2a93c049601710121e04ac4700007a00000000000000000000000000000000000000020100ca9a3b00000000009435770000000000ca9a3b01000000012a6469643a6f6e743a41626b35725255794a53636e6d504564526456793469376966695537796743385368208d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92f2f64656d6f2e7465737400012fee6d8699c9b8f992a6bd54753cf84cb3aae87400002d000000000000000000000000000000000000000201c80000000000000000943577000000006400000000000000").unwrap_or_default();
+    let mut source = Source::new(&data);
+    let mthod_name: &str = source.read().unwrap();
+    //    println!("mthod_name:{}", mthod_name);
+    let (resource_id, ddo, item): (&[u8], &[u8], &[u8]) = source.read().unwrap();
+    //    println!("resource_id:{}", to_hex(resource_id));
+    //    let ddo = ResourceDDO::from_bytes(ddo);
+    //    println!("manager:{}", ddo.manager);
+    //    let item = DTokenItem::from_bytes(item);
+    //    println!("item:{}", item.stocks);
+
+    let build = build_runtime();
+    let addr = ostd::macros::base58!("ARCESVnP8Lbf6S7FuTei3smA35EQYog4LR");
+    build.witness(&[addr]);
+    assert!(dtoken_seller_publish(resource_id, ddo, item));
 }
 
 #[test]
@@ -135,7 +153,8 @@ fn publish() {
 
     handle.witness(&[buyer.clone(), buyer2.clone()]);
     assert!(buy_dtoken_from_reseller(resource_id, 1, &buyer2, &buyer));
-    assert!(use_token(resource_id, &buyer2, token_template.clone(), 1));
+    let token_template_bytes = token_template.to_bytes();
+    assert!(use_token(resource_id, &buyer2, &token_template_bytes, 1));
 }
 
 fn mock_mp_contract(

@@ -25,7 +25,7 @@ const CRC32_SIZE: u32 = 4;
 const KEY_SELLER_ITEM_INFO: &[u8] = b"01";
 const KEY_SELLER_ITEM_SOLD: &[u8] = b"02";
 const DEFAULT_DTOKEN_CONTRACT_ADDRESS: Address =
-    ostd::macros::base58!("AZCf8WocqHmHmAcieVgpaeNbH9TeULg61v");
+    ostd::macros::base58!("ANJqh1GAGf1Fk1H5hr6n2VCYJHGZuWtXne");
 
 fn dtoken_seller_publish(resource_id: &[u8], resource_ddo_bytes: &[u8], item_bytes: &[u8]) -> bool {
     let resource_ddo = ResourceDDO::from_bytes(resource_ddo_bytes);

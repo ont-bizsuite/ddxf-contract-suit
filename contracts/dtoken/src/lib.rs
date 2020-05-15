@@ -16,8 +16,6 @@ use basic::*;
 #[cfg(test)]
 mod test;
 
-use hexutil::to_hex;
-
 const KEY_DTOKEN: &[u8] = b"01";
 const KEY_AGENT: &[u8] = b"02";
 const KEY_ACCOUNT_DTOKENS: &[u8] = b"03";
@@ -32,7 +30,6 @@ fn generate_dtoken(account: &Address, resource_id: &[u8], templates_bytes: &[u8]
     for token_template in templates.iter() {
         let key = token_template.to_bytes();
         let mut caa = get_count_and_agent(resource_id, account, &key);
-        println!("token_template.to_bytes():{}", to_hex(&key));
         caa.count += n as u32;
         update_count(
             resource_id,
@@ -220,13 +217,11 @@ fn get_count_and_agent(
     token_template_bytes: &[u8],
 ) -> CountAndAgent {
     let key = utils::generate_dtoken_key(resource_id, account, token_template_bytes);
-    println!("get_count_and_agent, key:{}", to_hex(&key));
     database::get::<_, CountAndAgent>(&key).unwrap_or(CountAndAgent::new(account.clone()))
 }
 
 fn update_count(resource_id: &[u8], account: &Address, token_template: &[u8], caa: CountAndAgent) {
     let key = utils::generate_dtoken_key(resource_id, account, token_template);
-    println!("update_count, key:{}", to_hex(&key));
     database::put(key, caa);
 }
 
