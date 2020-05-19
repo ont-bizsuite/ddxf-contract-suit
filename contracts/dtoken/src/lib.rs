@@ -312,7 +312,7 @@ pub fn invoke() {
         b"getDdxfContract" => {
             sink.write(get_ddxf_contract());
         }
-        b"" => {
+        b"migrate" => {
             let (code, vm_type, name, version, author, email, desc) = source.read().unwrap();
             sink.write(migrate(code, vm_type, name, version, author, email, desc));
         }
