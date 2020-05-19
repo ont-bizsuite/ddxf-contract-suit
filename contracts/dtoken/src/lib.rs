@@ -13,21 +13,29 @@ use ostd::runtime;
 use ostd::types::{Address, U128};
 mod basic;
 use basic::*;
+use ostd::runtime::check_witness;
+
 #[cfg(test)]
 mod test;
 
 const KEY_DTOKEN: &[u8] = b"01";
 const KEY_AGENT: &[u8] = b"02";
 const KEY_ACCOUNT_DTOKENS: &[u8] = b"03";
+const KEY_DDXF_CONTRACT: &[u8] = b"04";
 
-const DDXF_CONTRACT_ADDRESS: Address = ostd::macros::base58!("AbtTQJYKfQxq4UdygDsbLVjE8uRrJ2H3tP");
+const ADMIN: Address = ostd::macros::base58!("AbtTQJYKfQxq4UdygDsbLVjE8uRrJ2H3tP");
 
-pub fn generate_dtoken(
-    account: &Address,
-    resource_id: &[u8],
-    templates_bytes: &[u8],
-    n: U128,
-) -> bool {
+fn set_ddxf_contract(new_addr: &Address) -> bool {
+    assert!(check_witness(&ADMIN));
+    database::put(KEY_DDXF_CONTRACT, new_addr);
+    true
+}
+
+fn get_ddxf_contract() -> Address {
+    database::get(KEY_DDXF_CONTRACT).unwrap()
+}
+
+fn generate_dtoken(account: &Address, resource_id: &[u8], templates_bytes: &[u8], n: U128) -> bool {
     let mut source = Source::new(templates_bytes);
     let templates: Vec<TokenTemplate> = source.read().unwrap();
     check_caller();
@@ -254,9 +262,26 @@ fn remove_token_agents(
     true
 }
 
+fn migrate(
+    code: &[u8],
+    vm_type: u32,
+    name: &str,
+    version: &str,
+    author: &str,
+    email: &str,
+    desc: &str,
+) -> bool {
+    assert!(check_witness(&ADMIN));
+    let new_addr = runtime::contract_migrate(code, vm_type, name, version, author, email, desc);
+    let empty_addr = Address::new([0u8; 20]);
+    assert_ne!(new_addr, empty_addr);
+    true
+}
+
 fn check_caller() {
-    //    let caller = runtime::caller();
-    //    assert!(caller == DDXF_CONTRACT_ADDRESS);
+    let caller = runtime::caller();
+    let ddxf = get_ddxf_contract();
+    assert!(caller == ddxf);
 }
 
 fn get_count_and_agent(
@@ -280,6 +305,17 @@ pub fn invoke() {
     let action: &[u8] = source.read().unwrap();
     let mut sink = Sink::new(12);
     match action {
+        b"setDdxfContract" => {
+            let new_addr = source.read().unwrap();
+            sink.write(set_ddxf_contract(new_addr));
+        }
+        b"getDdxfContract" => {
+            sink.write(get_ddxf_contract());
+        }
+        b"" => {
+            let (code, vm_type, name, version, author, email, desc) = source.read().unwrap();
+            sink.write(migrate(code, vm_type, name, version, author, email, desc));
+        }
         b"generateDToken" => {
             let (account, resource_id, templates, n) = source.read().unwrap();
             sink.write(generate_dtoken(account, resource_id, templates, n));

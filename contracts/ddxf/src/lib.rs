@@ -15,6 +15,7 @@ mod dtoken;
 use common::*;
 use dtoken::*;
 use ostd::contract::{ong, ont, wasm};
+use ostd::runtime::{check_witness, contract_migrate};
 
 #[cfg(test)]
 mod test;
@@ -24,8 +25,18 @@ const CRC32_SIZE: u32 = 4;
 
 const KEY_SELLER_ITEM_INFO: &[u8] = b"01";
 const KEY_SELLER_ITEM_SOLD: &[u8] = b"02";
+const KEY_DTOKEN_CONTRACT: &[u8] = b"03";
+
+const ADMIN: Address = ostd::macros::base58!("AbtTQJYKfQxq4UdygDsbLVjE8uRrJ2H3tP");
 const DEFAULT_DTOKEN_CONTRACT_ADDRESS: Address =
     ostd::macros::base58!("Aeh6xwvz6PfGn7oejiL6v5eqDuGg5vE7pt");
+
+// need admin signature
+fn set_dtoken_contract(new_addr: &Address) -> bool {
+    assert!(check_witness(&ADMIN));
+    database::put(KEY_DTOKEN_CONTRACT, new_addr);
+    true
+}
 
 fn dtoken_seller_publish(resource_id: &[u8], resource_ddo_bytes: &[u8], item_bytes: &[u8]) -> bool {
     let resource_ddo = ResourceDDO::from_bytes(resource_ddo_bytes);
@@ -322,6 +333,23 @@ fn remove_token_agents(
     ));
     true
 }
+
+fn migrate(
+    code: &[u8],
+    vm_type: u32,
+    name: &str,
+    version: &str,
+    author: &str,
+    email: &str,
+    desc: &str,
+) -> bool {
+    assert!(check_witness(&ADMIN));
+    let new_addr = runtime::contract_migrate(code, vm_type, name, version, author, email, desc);
+    let empty_addr = Address::new([0u8; 20]);
+    assert_ne!(new_addr, empty_addr);
+    true
+}
+
 fn transfer_fee(
     buyer_account: &Address,
     seller_account: &Address,
@@ -392,6 +420,14 @@ pub fn invoke() {
     let action: &[u8] = source.read().unwrap();
     let mut sink = Sink::new(12);
     match action {
+        b"setDTokenContract" => {
+            let new_addr = source.read().unwrap();
+            sink.write(set_dtoken_contract(&new_addr));
+        }
+        b"migrate" => {
+            let (code, vm_type, name, version, author, email, desc) = source.read().unwrap();
+            sink.write(migrate(code, vm_type, name, version, author, email, desc));
+        }
         b"dtokenSellerPublish" => {
             let (resource_id, resource_ddo, item) = source.read().unwrap();
             sink.write(dtoken_seller_publish(resource_id, resource_ddo, item));
