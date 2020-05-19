@@ -43,6 +43,12 @@ pub fn generate_dtoken(
             caa.clone(),
         );
     }
+    EventBuilder::new()
+        .string("generateDToken")
+        .bytearray(resource_id)
+        .address(account)
+        .number(n)
+        .notify();
     true
 }
 
@@ -62,6 +68,12 @@ pub fn use_token(
     } else {
         database::put(key, caa);
     }
+    EventBuilder::new()
+        .string("useToken")
+        .bytearray(resource_id)
+        .address(account)
+        .number(n)
+        .notify();
     true
 }
 
@@ -88,6 +100,12 @@ pub fn use_token_by_agent(
         *agent_count -= n as u32;
         update_count(resource_id, account, token_template_bytes, caa);
     }
+    EventBuilder::new()
+        .string("useTokenByAgent")
+        .bytearray(resource_id)
+        .address(account)
+        .number(n)
+        .notify();
     true
 }
 
@@ -147,6 +165,12 @@ fn set_token_agents(
     let mut caa = get_count_and_agent(resource_id, account, token_template_bytes);
     caa.set_token_agents(agents.as_slice(), n);
     update_count(resource_id, account, token_template_bytes, caa);
+    EventBuilder::new()
+        .string("setTokenAgents")
+        .bytearray(resource_id)
+        .address(account)
+        .number(n)
+        .notify();
     true
 }
 
@@ -161,10 +185,13 @@ fn add_agents(
     let token_templates: Vec<TokenTemplate> = source.read().unwrap();
     check_caller();
     for token_template in token_templates.iter() {
-        let token_template_bytes = token_template.to_bytes();
-        let mut caa = get_count_and_agent(resource_id, account, &token_template_bytes);
-        caa.add_agents(agents.as_slice(), n as u32);
-        update_count(resource_id, account, &token_template_bytes, caa);
+        assert!(add_token_agents(
+            account,
+            resource_id,
+            &token_template.to_bytes(),
+            &agents,
+            n
+        ));
     }
     true
 }
@@ -173,13 +200,19 @@ fn add_token_agents(
     account: &Address,
     resource_id: &[u8],
     token_template_bytes: &[u8],
-    agents: Vec<Address>,
+    agents: &[Address],
     n: U128,
 ) -> bool {
     check_caller();
     let mut caa = get_count_and_agent(resource_id, account, token_template_bytes);
-    caa.add_agents(agents.as_slice(), n as u32);
+    caa.add_agents(agents, n as u32);
     update_count(resource_id, account, token_template_bytes, caa);
+    EventBuilder::new()
+        .string("addTokenAgents")
+        .bytearray(resource_id)
+        .address(account)
+        .number(n)
+        .notify();
     true
 }
 
@@ -213,6 +246,11 @@ fn remove_token_agents(
     let mut caa = get_count_and_agent(resource_id, account, token_template_bytes);
     caa.remove_agents(agents);
     update_count(resource_id, account, token_template_bytes, caa);
+    EventBuilder::new()
+        .string("removeTokenAgents")
+        .bytearray(resource_id)
+        .address(account)
+        .notify();
     true
 }
 
@@ -294,12 +332,18 @@ pub fn invoke() {
             sink.write(add_agents(account, resource_id, agents, n, token_templates));
         }
         b"addTokenAgents" => {
-            let (account, resource_id, token_template, agents, n) = source.read().unwrap();
+            let (account, resource_id, token_template, agents, n): (
+                &Address,
+                &[u8],
+                &[u8],
+                Vec<Address>,
+                U128,
+            ) = source.read().unwrap();
             sink.write(add_token_agents(
                 account,
                 resource_id,
                 token_template,
-                agents,
+                agents.as_slice(),
                 n,
             ));
         }

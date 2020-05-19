@@ -3,7 +3,7 @@ use super::ostd::prelude::*;
 use super::ostd::types::{Address, H256};
 use super::BTreeMap;
 use super::String;
-use common::{Fee, TokenTemplate, TokenType};
+use common::{Fee, TokenTemplate};
 
 #[derive(Clone)]
 pub struct ResourceDDO {
@@ -140,14 +140,18 @@ impl<'a> Decoder<'a> for ResourceDDO {
 
 #[derive(Clone)]
 pub enum RT {
+    Other,
     RTStaticFile,
 }
 
 impl Encoder for RT {
     fn encode(&self, sink: &mut Sink) {
         match self {
-            RT::RTStaticFile => {
+            RT::Other => {
                 sink.write(0u8);
+            }
+            RT::RTStaticFile => {
+                sink.write(1u8);
             }
         }
     }
@@ -157,8 +161,9 @@ impl<'a> Decoder<'a> for RT {
     fn decode(source: &mut Source<'a>) -> Result<Self, Error> {
         let u = source.read_byte()?;
         match u {
-            0 => Ok(RT::RTStaticFile),
-            _ => panic!(""),
+            0 => Ok(RT::Other),
+            1 => Ok(RT::RTStaticFile),
+            _ => panic!("not support rt:{}", u),
         }
     }
 }
@@ -201,35 +206,3 @@ impl DTokenItem {
         sink.bytes().to_vec()
     }
 }
-
-//impl Encoder for DTokenItem {
-//    fn encode(&self, sink: &mut Sink) {
-//        sink.write(&self.fee);
-//        sink.write(self.expired_date);
-//        sink.write(self.stocks);
-//        sink.write(self.templates.len() as u32);
-//        for token in self.templates.iter() {
-//            sink.write(token);
-//        }
-//    }
-//}
-//
-//impl<'a> Decoder<'a> for DTokenItem {
-//    fn decode(source: &mut Source<'a>) -> Result<Self, Error> {
-//        let fee: Fee = source.read()?;
-//        let expired_date: u64 = source.read()?;
-//        let stocks: u32 = source.read()?;
-//        let mut templates: Vec<TokenTemplate> = vec![];
-//        let l: u32 = source.read()?;
-//        for _ in 0..l {
-//            let v = source.read()?;
-//            templates.push(v);
-//        }
-//        Ok(DTokenItem {
-//            fee,
-//            expired_date,
-//            stocks,
-//            templates,
-//        })
-//    }
-//}

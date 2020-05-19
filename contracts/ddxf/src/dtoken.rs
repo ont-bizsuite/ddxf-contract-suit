@@ -1,7 +1,6 @@
 use super::ostd::contract::wasm;
 use super::DEFAULT_DTOKEN_CONTRACT_ADDRESS;
-use super::{Address, Sink, Vec, U128};
-use common::TokenTemplate;
+use super::{Address, Vec, U128};
 
 pub fn remove_agents_dtoken(
     contract_address: &Option<Address>,

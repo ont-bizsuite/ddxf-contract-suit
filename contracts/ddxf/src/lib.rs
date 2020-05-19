@@ -4,7 +4,7 @@ extern crate alloc;
 extern crate common;
 extern crate ontio_std as ostd;
 use alloc::collections::btree_map::BTreeMap;
-use ostd::abi::{Encoder, Sink, Source};
+use ostd::abi::{Sink, Source};
 use ostd::database;
 use ostd::prelude::*;
 use ostd::runtime;
@@ -25,7 +25,7 @@ const CRC32_SIZE: u32 = 4;
 const KEY_SELLER_ITEM_INFO: &[u8] = b"01";
 const KEY_SELLER_ITEM_SOLD: &[u8] = b"02";
 const DEFAULT_DTOKEN_CONTRACT_ADDRESS: Address =
-    ostd::macros::base58!("ANJqh1GAGf1Fk1H5hr6n2VCYJHGZuWtXne");
+    ostd::macros::base58!("Aeh6xwvz6PfGn7oejiL6v5eqDuGg5vE7pt");
 
 fn dtoken_seller_publish(resource_id: &[u8], resource_ddo_bytes: &[u8], item_bytes: &[u8]) -> bool {
     let resource_ddo = ResourceDDO::from_bytes(resource_ddo_bytes);
@@ -47,6 +47,9 @@ fn dtoken_seller_publish(resource_id: &[u8], resource_ddo_bytes: &[u8], item_byt
             .get(token_template)
             .unwrap_or(&resource_ddo.resource_type);
         match rt {
+            RT::Other => {
+                assert_eq!(token_template.token_hash.len() as u32, SHA256_SIZE);
+            }
             RT::RTStaticFile => {
                 if token_template.data_ids.is_none() {
                     assert_eq!(
