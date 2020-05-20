@@ -4,7 +4,7 @@ extern crate alloc;
 extern crate common;
 extern crate ontio_std as ostd;
 use alloc::collections::btree_map::BTreeMap;
-use ostd::abi::{Sink, Source};
+use ostd::abi::{EventBuilder, Sink, Source};
 use ostd::database;
 use ostd::prelude::*;
 use ostd::runtime;
@@ -112,6 +112,13 @@ fn buy_dtoken_from_reseller(
         &item_info.item.get_templates_bytes(),
         n
     ));
+    EventBuilder::new()
+        .string("buyDtokenFromReseller")
+        .bytearray(resource_id)
+        .number(n)
+        .address(buyer_account)
+        .address(reseller_account)
+        .notify();
     true
 }
 
@@ -142,7 +149,7 @@ fn buy_dtokens_and_set_agents(
     assert!(set_token_agents(
         resource_ids[authorized_index as usize],
         buyer_account,
-        vec![agent],
+        vec![agent.clone()],
         authorized_token_template_bytes,
         ns[authorized_index as usize],
     ));
@@ -183,6 +190,12 @@ fn buy_dtoken(resource_id: &[u8], n: U128, buyer_account: &Address) -> bool {
         &item_info.item.get_templates_bytes(),
         n
     ));
+    EventBuilder::new()
+        .string("buyDtoken")
+        .bytearray(resource_id)
+        .number(n)
+        .address(buyer_account)
+        .notify();
     true
 }
 
@@ -198,6 +211,12 @@ fn use_token(resource_id: &[u8], account: &Address, token_template_bytes: &[u8],
         token_template_bytes,
         n
     ));
+    EventBuilder::new()
+        .string("useToken")
+        .bytearray(resource_id)
+        .address(account)
+        .number(n)
+        .notify();
     true
 }
 
@@ -220,6 +239,13 @@ fn use_token_by_agent(
         token_template_bytes,
         n
     ));
+    EventBuilder::new()
+        .string("useTokenByAgent")
+        .bytearray(resource_id)
+        .address(account)
+        .address(agent)
+        .number(n)
+        .notify();
     true
 }
 
@@ -242,7 +268,7 @@ fn set_agents(resource_id: &[u8], account: &Address, agents: Vec<&Address>, n: U
 fn set_token_agents(
     resource_id: &[u8],
     account: &Address,
-    agents: Vec<&Address>,
+    agents: Vec<Address>,
     template_bytes: &[u8],
     n: U128,
 ) -> bool {
@@ -255,9 +281,15 @@ fn set_token_agents(
         account,
         resource_id,
         &template_bytes,
-        agents,
+        agents.as_slice(),
         n,
     ));
+    EventBuilder::new()
+        .string("setTokenAgents")
+        .bytearray(resource_id)
+        .address(account)
+        .number(n)
+        .notify();
     true
 }
 
@@ -274,6 +306,12 @@ fn add_agents(resource_id: &[u8], account: &Address, agents: Vec<&Address>, n: U
         n,
         &item_info.item.get_templates_bytes()
     ));
+    EventBuilder::new()
+        .string("addAgents")
+        .bytearray(resource_id)
+        .address(account)
+        .number(n)
+        .notify();
     true
 }
 
@@ -296,6 +334,12 @@ fn add_token_agents(
         agents,
         n
     ));
+    EventBuilder::new()
+        .string("addTokenAgents")
+        .bytearray(resource_id)
+        .address(account)
+        .number(n)
+        .notify();
     true
 }
 
@@ -311,6 +355,11 @@ fn remove_agents(resource_id: &[u8], account: &Address, agents: Vec<&Address>) -
         agents,
         &item_info.item.get_templates_bytes()
     ));
+    EventBuilder::new()
+        .string("removeAgents")
+        .bytearray(resource_id)
+        .address(account)
+        .notify();
     true
 }
 
@@ -331,6 +380,11 @@ fn remove_token_agents(
         token_template_bytes,
         agents,
     ));
+    EventBuilder::new()
+        .string("removeTokenAgents")
+        .bytearray(resource_id)
+        .address(account)
+        .notify();
     true
 }
 
@@ -347,6 +401,10 @@ fn migrate(
     let new_addr = runtime::contract_migrate(code, vm_type, name, version, author, email, desc);
     let empty_addr = Address::new([0u8; 20]);
     assert_ne!(new_addr, empty_addr);
+    EventBuilder::new()
+        .string("migrate")
+        .address(&new_addr)
+        .notify();
     true
 }
 
@@ -488,6 +546,16 @@ pub fn invoke() {
         b"setAgents" => {
             let (resource_id, account, agents, n) = source.read().unwrap();
             sink.write(set_agents(resource_id, account, agents, n));
+        }
+        b"setTokenAgents" => {
+            let (resource_id, account, agents, template_bytes, n) = source.read().unwrap();
+            sink.write(set_token_agents(
+                resource_id,
+                account,
+                agents,
+                template_bytes,
+                n,
+            ));
         }
         b"addAgents" => {
             let (resource_id, account, agents, n) = source.read().unwrap();

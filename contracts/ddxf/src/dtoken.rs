@@ -59,7 +59,7 @@ pub fn set_token_agents_dtoken(
     account: &Address,
     resource_id: &[u8],
     token_template_bytes: &[u8],
-    agents: Vec<&Address>,
+    agents: &[Address],
     n: U128,
 ) -> bool {
     wasm::call_contract(
