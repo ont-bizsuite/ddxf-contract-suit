@@ -28,9 +28,7 @@ const KEY_SELLER_ITEM_SOLD: &[u8] = b"02";
 const KEY_DTOKEN_CONTRACT: &[u8] = b"03";
 const KEY_ADMIN: &[u8] = b"04";
 
-const ADMIN: Address = ostd::macros::base58!("AbtTQJYKfQxq4UdygDsbLVjE8uRrJ2H3tP");
-const DEFAULT_DTOKEN_CONTRACT_ADDRESS: Address =
-    ostd::macros::base58!("Aeh6xwvz6PfGn7oejiL6v5eqDuGg5vE7pt");
+const ADMIN: Address = ostd::macros::base58!("AYnhakv7kC9R5ppw65JoE2rt6xDzCjCTvD");
 
 // need admin signature
 fn set_dtoken_contract(new_addr: &Address) -> bool {
@@ -38,6 +36,11 @@ fn set_dtoken_contract(new_addr: &Address) -> bool {
     database::put(KEY_DTOKEN_CONTRACT, new_addr);
     true
 }
+
+fn get_dtoken_contract() -> Address {
+    database::get::<_, Address>(KEY_DTOKEN_CONTRACT).unwrap()
+}
+
 // need old admin signature
 fn update_admin(new_admin: &Address) -> bool {
     let old_admin = get_admin();
@@ -116,8 +119,12 @@ fn buy_dtoken_from_reseller(
         item_info.item.fee.clone(),
         n
     ));
+    let dtoken = get_dtoken_contract();
     assert!(transfer_dtoken(
-        &item_info.resource_ddo.dtoken_contract_address,
+        &item_info
+            .resource_ddo
+            .dtoken_contract_address
+            .unwrap_or(dtoken),
         reseller_account,
         buyer_account,
         resource_id,
@@ -195,8 +202,13 @@ fn buy_dtoken(resource_id: &[u8], n: U128, buyer_account: &Address) -> bool {
         n
     ));
     database::put(utils::generate_seller_item_sold_key(resource_id), sum);
+
+    let dtoken = get_dtoken_contract();
     assert!(generate_dtoken(
-        &item_info.resource_ddo.dtoken_contract_address,
+        &item_info
+            .resource_ddo
+            .dtoken_contract_address
+            .unwrap_or(dtoken),
         buyer_account,
         resource_id,
         &item_info.item.get_templates_bytes(),
@@ -216,8 +228,12 @@ fn use_token(resource_id: &[u8], account: &Address, token_template_bytes: &[u8],
     let item_info =
         database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
             .unwrap();
+    let dtoken = get_dtoken_contract();
     assert!(use_token_dtoken(
-        &item_info.resource_ddo.dtoken_contract_address,
+        &item_info
+            .resource_ddo
+            .dtoken_contract_address
+            .unwrap_or(dtoken),
         account,
         resource_id,
         token_template_bytes,
@@ -243,8 +259,12 @@ fn use_token_by_agent(
     let item_info =
         database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
             .unwrap();
+    let dtoken = get_dtoken_contract();
     assert!(use_token_by_agent_dtoken(
-        &item_info.resource_ddo.dtoken_contract_address,
+        &item_info
+            .resource_ddo
+            .dtoken_contract_address
+            .unwrap_or(dtoken),
         account,
         agent,
         resource_id,
@@ -266,8 +286,12 @@ fn set_agents(resource_id: &[u8], account: &Address, agents: Vec<&Address>, n: U
     let item_info =
         database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
             .unwrap();
+    let dtoken = get_dtoken_contract();
     assert!(set_agents_dtoken(
-        &item_info.resource_ddo.dtoken_contract_address,
+        &item_info
+            .resource_ddo
+            .dtoken_contract_address
+            .unwrap_or(dtoken),
         account,
         resource_id,
         agents,
@@ -288,8 +312,12 @@ fn set_token_agents(
     let item_info =
         database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
             .unwrap();
+    let dtoken = get_dtoken_contract();
     assert!(set_token_agents_dtoken(
-        &item_info.resource_ddo.dtoken_contract_address,
+        &item_info
+            .resource_ddo
+            .dtoken_contract_address
+            .unwrap_or(dtoken),
         account,
         resource_id,
         &template_bytes,
@@ -310,8 +338,12 @@ fn add_agents(resource_id: &[u8], account: &Address, agents: Vec<&Address>, n: U
     let item_info =
         database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
             .unwrap();
+    let dtoken = get_dtoken_contract();
     assert!(add_agents_dtoken(
-        &item_info.resource_ddo.dtoken_contract_address,
+        &item_info
+            .resource_ddo
+            .dtoken_contract_address
+            .unwrap_or(dtoken),
         account,
         resource_id,
         agents,
@@ -338,8 +370,12 @@ fn add_token_agents(
     let item_info =
         database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
             .unwrap();
+    let dtoken = get_dtoken_contract();
     assert!(add_token_agents_dtoken(
-        &item_info.resource_ddo.dtoken_contract_address,
+        &item_info
+            .resource_ddo
+            .dtoken_contract_address
+            .unwrap_or(dtoken),
         account,
         resource_id,
         token_template_bytes,
@@ -360,8 +396,12 @@ fn remove_agents(resource_id: &[u8], account: &Address, agents: Vec<&Address>) -
     let item_info =
         database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
             .unwrap();
+    let dtoken = get_dtoken_contract();
     assert!(remove_agents_dtoken(
-        &item_info.resource_ddo.dtoken_contract_address,
+        &item_info
+            .resource_ddo
+            .dtoken_contract_address
+            .unwrap_or(dtoken),
         account,
         resource_id,
         agents,
@@ -385,8 +425,12 @@ fn remove_token_agents(
     let item_info =
         database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
             .unwrap();
+    let dtoken = get_dtoken_contract();
     assert!(remove_token_agents_dtoken(
-        &item_info.resource_ddo.dtoken_contract_address,
+        &item_info
+            .resource_ddo
+            .dtoken_contract_address
+            .unwrap_or(dtoken),
         account,
         resource_id,
         token_template_bytes,
@@ -411,7 +455,7 @@ fn migrate(
 ) -> bool {
     let admin = get_admin();
     assert!(check_witness(&admin));
-    let new_addr = runtime::contract_migrate(code, vm_type, name, version, author, email, desc);
+    let new_addr = contract_migrate(code, vm_type, name, version, author, email, desc);
     let empty_addr = Address::new([0u8; 20]);
     assert_ne!(new_addr, empty_addr);
     EventBuilder::new()
@@ -501,6 +545,9 @@ pub fn invoke() {
         b"setDTokenContract" => {
             let new_addr = source.read().unwrap();
             sink.write(set_dtoken_contract(&new_addr));
+        }
+        b"getDTokenContract" => {
+            sink.write(get_dtoken_contract());
         }
         b"migrate" => {
             let (code, vm_type, name, version, author, email, desc) = source.read().unwrap();

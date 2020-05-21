@@ -1,16 +1,15 @@
 use super::ostd::contract::wasm;
-use super::DEFAULT_DTOKEN_CONTRACT_ADDRESS;
 use super::{Address, Vec, U128};
 
 pub fn remove_agents_dtoken(
-    contract_address: &Option<Address>,
+    contract_address: &Address,
     account: &Address,
     resource_id: &[u8],
     agents: Vec<&Address>,
     templates_bytes: &[u8],
 ) -> bool {
     wasm::call_contract(
-        &contract_address.unwrap_or(DEFAULT_DTOKEN_CONTRACT_ADDRESS),
+        contract_address,
         (
             "removeAgents",
             (account, resource_id, agents, templates_bytes),
@@ -20,14 +19,14 @@ pub fn remove_agents_dtoken(
 }
 
 pub fn remove_token_agents_dtoken(
-    contract_address: &Option<Address>,
+    contract_address: &Address,
     account: &Address,
     resource_id: &[u8],
     template_bytes: &[u8],
     agents: Vec<&Address>,
 ) -> bool {
     wasm::call_contract(
-        &contract_address.unwrap_or(DEFAULT_DTOKEN_CONTRACT_ADDRESS),
+        contract_address,
         (
             "removeAgents",
             (account, resource_id, agents, template_bytes),
@@ -37,7 +36,7 @@ pub fn remove_token_agents_dtoken(
 }
 
 pub fn set_agents_dtoken(
-    contract_address: &Option<Address>,
+    contract_address: &Address,
     account: &Address,
     resource_id: &[u8],
     agents: Vec<&Address>,
@@ -45,7 +44,7 @@ pub fn set_agents_dtoken(
     token_templates_bytes: &[u8],
 ) -> bool {
     wasm::call_contract(
-        &contract_address.unwrap_or(DEFAULT_DTOKEN_CONTRACT_ADDRESS),
+        contract_address,
         (
             "setAgents",
             (account, resource_id, agents, n, token_templates_bytes),
@@ -55,7 +54,7 @@ pub fn set_agents_dtoken(
 }
 
 pub fn set_token_agents_dtoken(
-    contract_address: &Option<Address>,
+    contract_address: &Address,
     account: &Address,
     resource_id: &[u8],
     token_template_bytes: &[u8],
@@ -63,7 +62,7 @@ pub fn set_token_agents_dtoken(
     n: U128,
 ) -> bool {
     wasm::call_contract(
-        &contract_address.unwrap_or(DEFAULT_DTOKEN_CONTRACT_ADDRESS),
+        contract_address,
         (
             "setTokenAgents",
             (account, resource_id, token_template_bytes, agents, n),
@@ -73,21 +72,21 @@ pub fn set_token_agents_dtoken(
 }
 
 pub fn use_token_dtoken(
-    contract_address: &Option<Address>,
+    contract_address: &Address,
     account: &Address,
     resource_id: &[u8],
     token_template_bytes: &[u8],
     n: U128,
 ) -> bool {
     wasm::call_contract(
-        &contract_address.unwrap_or(DEFAULT_DTOKEN_CONTRACT_ADDRESS),
+        contract_address,
         ("useToken", (account, resource_id, token_template_bytes, n)),
     );
     true
 }
 
 pub fn add_token_agents_dtoken(
-    contract_address: &Option<Address>,
+    contract_address: &Address,
     account: &Address,
     resource_id: &[u8],
     token_template_bytes: &[u8],
@@ -95,7 +94,7 @@ pub fn add_token_agents_dtoken(
     n: U128,
 ) -> bool {
     wasm::call_contract(
-        &contract_address.unwrap_or(DEFAULT_DTOKEN_CONTRACT_ADDRESS),
+        contract_address,
         (
             "addTokenAgents",
             (account, resource_id, token_template_bytes, agents, n),
@@ -104,7 +103,7 @@ pub fn add_token_agents_dtoken(
     true
 }
 pub fn add_agents_dtoken(
-    contract_address: &Option<Address>,
+    contract_address: &Address,
     account: &Address,
     resource_id: &[u8],
     agents: Vec<&Address>,
@@ -112,7 +111,7 @@ pub fn add_agents_dtoken(
     token_templates_bytes: &[u8],
 ) -> bool {
     wasm::call_contract(
-        &contract_address.unwrap_or(DEFAULT_DTOKEN_CONTRACT_ADDRESS),
+        contract_address,
         (
             "addAgents",
             (account, resource_id, agents, n, token_templates_bytes),
@@ -122,7 +121,7 @@ pub fn add_agents_dtoken(
 }
 
 pub fn use_token_by_agent_dtoken(
-    contract_address: &Option<Address>,
+    contract_address: &Address,
     account: &Address,
     agent: &Address,
     resource_id: &[u8],
@@ -130,7 +129,7 @@ pub fn use_token_by_agent_dtoken(
     n: U128,
 ) -> bool {
     wasm::call_contract(
-        &contract_address.unwrap_or(DEFAULT_DTOKEN_CONTRACT_ADDRESS),
+        contract_address,
         (
             "useTokenByAgent",
             (account, agent, resource_id, token_template_bytes, n),
@@ -140,7 +139,7 @@ pub fn use_token_by_agent_dtoken(
 }
 
 pub fn transfer_dtoken(
-    contract_address: &Option<Address>,
+    contract_address: &Address,
     from_account: &Address,
     to_account: &Address,
     resource_id: &[u8],
@@ -148,7 +147,7 @@ pub fn transfer_dtoken(
     n: U128,
 ) -> bool {
     wasm::call_contract(
-        &contract_address.unwrap_or(DEFAULT_DTOKEN_CONTRACT_ADDRESS),
+        contract_address,
         (
             "transferDToken",
             (from_account, to_account, resource_id, templates_bytes, n),
@@ -158,14 +157,14 @@ pub fn transfer_dtoken(
 }
 
 pub fn generate_dtoken(
-    contract_address: &Option<Address>,
+    contract_address: &Address,
     account: &Address,
     resource_id: &[u8],
     templates_bytes: &[u8],
     n: U128,
 ) -> bool {
     wasm::call_contract(
-        &contract_address.unwrap_or(DEFAULT_DTOKEN_CONTRACT_ADDRESS),
+        contract_address,
         ("generateDToken", (account, resource_id, templates_bytes, n)),
     );
     true

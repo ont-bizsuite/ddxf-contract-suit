@@ -1,4 +1,3 @@
-use super::database::*;
 use super::ostd::abi::{Decoder, Encoder, Error, Sink, Source};
 use super::ostd::types::{Address, U128};
 use super::BTreeMap;
@@ -11,7 +10,8 @@ pub struct CountAndAgent {
 
 impl CountAndAgent {
     pub fn new(addr: Address) -> Self {
-        let agents: BTreeMap<Address, u32> = BTreeMap::new();
+        let mut agents: BTreeMap<Address, u32> = BTreeMap::new();
+        agents.insert(addr, 0);
         CountAndAgent { count: 0, agents }
     }
 

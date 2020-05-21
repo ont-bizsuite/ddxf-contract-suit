@@ -5,9 +5,8 @@ extern crate common;
 extern crate ontio_std as ostd;
 use alloc::collections::btree_map::BTreeMap;
 use common::*;
-use ostd::abi::{Decoder, Encoder, Error, EventBuilder, Sink, Source};
+use ostd::abi::{EventBuilder, Sink, Source};
 use ostd::database;
-use ostd::prelude::H256;
 use ostd::prelude::*;
 use ostd::runtime;
 use ostd::types::{Address, U128};
@@ -19,11 +18,9 @@ use ostd::runtime::check_witness;
 mod test;
 
 const KEY_DTOKEN: &[u8] = b"01";
-const KEY_AGENT: &[u8] = b"02";
-const KEY_ACCOUNT_DTOKENS: &[u8] = b"03";
-const KEY_DDXF_CONTRACT: &[u8] = b"04";
+const KEY_DDXF_CONTRACT: &[u8] = b"02";
 
-const ADMIN: Address = ostd::macros::base58!("AbtTQJYKfQxq4UdygDsbLVjE8uRrJ2H3tP");
+const ADMIN: Address = ostd::macros::base58!("AYnhakv7kC9R5ppw65JoE2rt6xDzCjCTvD");
 
 fn set_ddxf_contract(new_addr: &Address) -> bool {
     assert!(check_witness(&ADMIN));
@@ -338,7 +335,7 @@ pub fn invoke() {
                 n,
             ));
         }
-        b"transferDtoken" => {
+        b"transferDToken" => {
             let (from_account, to_account, resource_id, templates_bytes, n) =
                 source.read().unwrap();
             sink.write(transfer_dtoken(
@@ -422,21 +419,6 @@ mod utils {
             resource_id,
             account.as_ref(),
             token_template_bytes,
-        ]
-        .concat()
-    }
-    pub fn generate_agent_key(
-        resource_id: &[u8],
-        account: &Address,
-        token_hash: &[u8],
-        agent: &Address,
-    ) -> Vec<u8> {
-        [
-            KEY_AGENT,
-            resource_id,
-            account.as_ref(),
-            token_hash,
-            agent.as_ref(),
         ]
         .concat()
     }

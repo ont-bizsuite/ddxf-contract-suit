@@ -23,6 +23,7 @@ impl ResourceDDO {
         let mut source = Source::new(data);
         source.read().unwrap()
     }
+    #[cfg(test)]
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut sink = Sink::new(16);
         sink.write(self);
@@ -200,6 +201,7 @@ impl DTokenItem {
         source.read().unwrap()
     }
 
+    #[cfg(test)]
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut sink = Sink::new(16);
         sink.write(self);
