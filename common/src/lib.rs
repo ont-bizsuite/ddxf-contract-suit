@@ -2,6 +2,7 @@
 #![feature(proc_macro_hygiene)]
 extern crate ontio_std as ostd;
 use core::cmp::{Eq, Ord, PartialEq, PartialOrd};
+use core::option::Option;
 use ostd::abi::{Decoder, Encoder, Error, Sink, Source};
 use ostd::prelude::*;
 

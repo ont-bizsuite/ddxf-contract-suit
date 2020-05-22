@@ -49,7 +49,7 @@ fn test2() {
 
 #[test]
 fn test3() {
-    let data = read_hex("067265736f5f347900010000000020000000000000000000000000000000000000000000000000000000000000000000fbe02b027e61a6d7602f26cfa9487fa58ef9ee7208656e64706f696e74010000000020000000000000000000000000000000000000000000000000000000000000000009656e64706f696e7432000000004c00000000000000000000000000000000000000000164000000000000001223c55e00000000640000000100200000000000000000000000000000000000000000000000000000000000000000").unwrap_or_default();
+    let data = read_hex("067265736f5f347f00010000000102313220000000000000000000000000000000000000000000000000000000000000000001fbe02b027e61a6d7602f26cfa9487fa58ef9ee7208656e64706f696e74010000000102313220000000000000000000000000000000000000000000000000000000000000000009656e64706f696e7432000000004f000000000000000000000000000000000000000001640000000000000005cac65e00000000010000000101023132200000000000000000000000000000000000000000000000000000000000000000").unwrap_or_default();
     let mut source = Source::new(&data);
     //    let mthod_name: &str = source.read().unwrap();
     //    println!("method_name:{}", mthod_name);
@@ -154,6 +154,13 @@ fn publish() {
         mp_contract_address: None,
         split_policy_contract_address: None,
     };
+
+    let mut sink_temp = Sink::new(64);
+    sink_temp.write(&ddo);
+    let mut source = Source::new(sink_temp.bytes());
+    let ddo_temp: ResourceDDO = source.read().unwrap();
+    assert_eq!(&ddo.manager, &ddo_temp.manager);
+
     let contract_addr = Address::repeat_byte(4);
     let fee = Fee {
         contract_addr,
@@ -170,12 +177,14 @@ fn publish() {
     };
 
     let handle = build_runtime();
-    handle.witness(&[manager.clone()]);
+    handle.witness(&[manager.clone(), ADMIN.clone()]);
     assert!(dtoken_seller_publish(
         resource_id,
         &ddo.to_bytes(),
         &dtoken_item.to_bytes()
     ));
+
+    assert!(set_dtoken_contract(&dtoken_contract_address));
 
     let buyer = Address::repeat_byte(4);
 
@@ -200,6 +209,7 @@ fn publish() {
     handle.witness(&[buyer.clone(), buyer2.clone()]);
     assert!(buy_dtoken_from_reseller(resource_id, 1, &buyer2, &buyer));
     let token_template_bytes = token_template.to_bytes();
+
     assert!(use_token(resource_id, &buyer2, &token_template_bytes, 1));
 }
 
