@@ -19,17 +19,31 @@ mod test;
 
 const KEY_DTOKEN: &[u8] = b"01";
 const KEY_DDXF_CONTRACT: &[u8] = b"02";
+const KEY_ADMIN: &[u8] = b"03";
 
 const ADMIN: Address = ostd::macros::base58!("AYnhakv7kC9R5ppw65JoE2rt6xDzCjCTvD");
 
 fn set_ddxf_contract(new_addr: &Address) -> bool {
-    assert!(check_witness(&ADMIN));
+    let admin = get_admin();
+    assert!(check_witness(&admin));
     database::put(KEY_DDXF_CONTRACT, new_addr);
     true
 }
 
 fn get_ddxf_contract() -> Address {
     database::get(KEY_DDXF_CONTRACT).unwrap()
+}
+
+// need old admin signature
+fn update_admin(new_admin: &Address) -> bool {
+    let old_admin = get_admin();
+    assert!(check_witness(&old_admin));
+    database::put(KEY_ADMIN, new_admin);
+    true
+}
+
+fn get_admin() -> Address {
+    database::get::<_, Address>(KEY_ADMIN).unwrap_or(ADMIN)
 }
 
 fn generate_dtoken(account: &Address, resource_id: &[u8], templates_bytes: &[u8], n: U128) -> bool {
@@ -268,7 +282,8 @@ fn migrate(
     email: &str,
     desc: &str,
 ) -> bool {
-    assert!(check_witness(&ADMIN));
+    let admin = get_admin();
+    assert!(check_witness(&admin));
     let new_addr = runtime::contract_migrate(code, vm_type, name, version, author, email, desc);
     let empty_addr = Address::new([0u8; 20]);
     assert_ne!(new_addr, empty_addr);
@@ -302,6 +317,13 @@ pub fn invoke() {
     let action: &[u8] = source.read().unwrap();
     let mut sink = Sink::new(12);
     match action {
+        b"updateAdmin" => {
+            let new_admin = source.read().unwrap();
+            sink.write(update_admin(&new_admin));
+        }
+        b"getAdmin" => {
+            sink.write(get_admin());
+        }
         b"setDdxfContract" => {
             let new_addr = source.read().unwrap();
             sink.write(set_ddxf_contract(new_addr));
