@@ -4,7 +4,8 @@ members = [
     "contracts/ddxf",
     "contracts/dtoken",
     "contracts/marketplace",
-    "contracts/split_policy"
+    "contracts/split_policy",
+    "contracts/data_id"
 ]
 
 [profile.release]
