@@ -181,6 +181,23 @@ fn buy_dtokens_and_set_agents(
     true
 }
 
+fn get_token_templates_endpoint(resource_id: &[u8]) -> Vec<u8> {
+    let item_info =
+        database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
+            .unwrap();
+    let mut sink = Sink::new(64);
+    sink.write(item_info.item.templates.len() as u32);
+    for (template, endpoint) in item_info.resource_ddo.token_endpoint.iter() {
+        sink.write(template);
+        if endpoint == "" {
+            sink.write(&item_info.resource_ddo.endpoint);
+        } else {
+            sink.write(endpoint);
+        }
+    }
+    return sink.bytes().to_vec();
+}
+
 fn buy_dtoken(resource_id: &[u8], n: U128, buyer_account: &Address) -> bool {
     assert!(runtime::check_witness(buyer_account));
     let item_info =
@@ -595,6 +612,10 @@ pub fn invoke() {
         b"buyDtoken" => {
             let (resource_id, n, buyer_account) = source.read().unwrap();
             sink.write(buy_dtoken(resource_id, n, buyer_account));
+        }
+        b"getTokenTemplates" => {
+            let resource_id = source.read().unwrap();
+            sink.write(get_token_templates_endpoint(resource_id));
         }
         b"useToken" => {
             let (resource_id, account, token_template, n) = source.read().unwrap();

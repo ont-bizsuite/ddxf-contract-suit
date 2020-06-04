@@ -9,10 +9,10 @@ use ostd::prelude::*;
 #[cfg(test)]
 mod test;
 
-#[derive(Clone, Ord, Eq, PartialEq, PartialOrd, Encoder, Decoder)]
+#[derive(Clone, Debug, Ord, Eq, PartialEq, PartialOrd, Encoder, Decoder)]
 pub struct TokenTemplate {
     pub data_ids: Option<Vec<u8>>,
-    pub token_hash: Vec<u8>,
+    pub token_hash: Vec<Vec<u8>>,
 }
 
 impl TokenTemplate {
@@ -29,7 +29,7 @@ impl TokenTemplate {
 }
 
 impl TokenTemplate {
-    pub fn new(data_ids: Option<Vec<u8>>, token_hash: Vec<u8>) -> Self {
+    pub fn new(data_ids: Option<Vec<u8>>, token_hash: Vec<Vec<u8>>) -> Self {
         TokenTemplate {
             data_ids,
             token_hash,

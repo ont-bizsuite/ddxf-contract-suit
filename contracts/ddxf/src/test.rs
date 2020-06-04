@@ -6,9 +6,25 @@ use ostd::mock::contract_mock::Command;
 use ostd::prelude::String;
 
 #[test]
+fn test_token_template() {
+    let tt = TokenTemplate {
+        data_ids: None,
+        token_hash: vec![vec![0u8; 32]],
+    };
+    let mut sink = Sink::new(16);
+    sink.write(tt.clone());
+    let mut source = Source::new(sink.bytes());
+    let tt2: TokenTemplate = source.read().unwrap();
+    assert_eq!(tt, tt2);
+}
+
+#[test]
 fn test() {
-    let data = read_hex("fdc8011364746f6b656e53656c6c65725075626c6973682435333963656464372d363363392d346231622d386165332d383764303236653331316532fd3c0100010000000020997a019b98e9847a0c3343bae2d7ad8d931bf784e11ad736539702b661b7f163002dadc839e0e46ade7c400c63704236c1567f09b76a68747470733a2f2f646576332e736167616d61726b65742e696f2f746f6b656e2d686173682f6170692f39393761303139623938653938343761306333333433626165326437616438643933316266373834653131616437333635333937303262363631623766313633010000000020997a019b98e9847a0c3343bae2d7ad8d931bf784e11ad736539702b661b7f1636a68747470733a2f2f646576332e736167616d61726b65742e696f2f746f6b656e2d686173682f6170692f39393761303139623938653938343761306333333433626165326437616438643933316266373834653131616437333635333937303262363631623766313633000000004f000000000000000000000000000000000000000201000000000000000000f2052a0100000000943577010000000020997a019b98e9847a0c3343bae2d7ad8d931bf784e11ad736539702b661b7f163").unwrap_or_default();
+    let data = read_hex("00010000000000017a0842016023031e8c24c7ea90cac9aa52f3b7da000100000000000001207d479be9ae1b65d3f0e98327c2eafc5f2e0e0693e15d175198735e0a8eec8f91000000").unwrap_or_default();
     let mut source = Source::new(&data);
+
+    let ddo = ResourceDDO::from_bytes(data.as_slice());
+
     let method: &[u8] = source.read().unwrap();
     let (resource_id, ddo_bytes, item_bytes): (Vec<u8>, &[u8], &[u8]) = source.read().unwrap();
     println!("resource_id:{:?}", String::from_utf8(resource_id));
@@ -29,7 +45,7 @@ fn dtoken_test() {
         },
         expired_date: 10000,
         stocks: 1000,
-        templates: vec![TokenTemplate::new(None, vec![1u8; 32])],
+        templates: vec![TokenTemplate::new(None, vec![vec![1u8; 32]])],
     };
 
     let mut sink = Sink::new(16);
@@ -97,7 +113,7 @@ fn serialize() {
         .unwrap_or_default();
     let token_template = TokenTemplate::new(
         Some(b"did:ont:Abk5rRUyJScnmPEdRdVy4i7ifiU7ygC8Sh".to_vec()),
-        token_hash,
+        vec![token_hash],
     );
     bmap.insert(token_template.clone(), RT::RTStaticFile);
 
@@ -136,7 +152,7 @@ fn publish() {
     let resource_id = b"resource_id";
     let mut bmap: BTreeMap<TokenTemplate, RT> = BTreeMap::new();
     let temp = vec![0u8; 36];
-    let token_template = TokenTemplate::new(None, temp);
+    let token_template = TokenTemplate::new(None, vec![temp]);
     bmap.insert(token_template.clone(), RT::RTStaticFile);
 
     let manager = Address::repeat_byte(1);
@@ -204,7 +220,8 @@ fn publish() {
     handle.on_contract_call(call_contract);
 
     handle.witness(&[buyer.clone()]);
-    assert!(buy_dtoken(resource_id, 1, &buyer));
+    //    assert!(buy_dtoken(resource_id, 1, &buyer));
+    assert!(buy_dtokens(vec![resource_id], vec![1], &buyer));
 
     handle.witness(&[buyer.clone(), buyer2.clone()]);
     assert!(buy_dtoken_from_reseller(resource_id, 1, &buyer2, &buyer));
@@ -237,7 +254,6 @@ fn mock_mp_contract(
             let ba = ong_balance_map.get(addr).map(|val| val.clone()).unwrap();
             sink.write(ba);
         }
-        _ => {}
     }
     return Some(sink.bytes().to_vec());
 }
