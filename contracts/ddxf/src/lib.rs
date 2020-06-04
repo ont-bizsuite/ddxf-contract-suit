@@ -3,7 +3,6 @@
 extern crate alloc;
 extern crate common;
 extern crate ontio_std as ostd;
-use alloc::collections::btree_map::BTreeMap;
 use ostd::abi::{EventBuilder, Sink, Source};
 use ostd::database;
 use ostd::prelude::*;
@@ -60,37 +59,27 @@ fn dtoken_seller_publish(resource_id: &[u8], resource_ddo_bytes: &[u8], item_byt
     let resource =
         database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id));
     assert!(resource.is_none());
-    if resource_ddo.endpoint.is_empty() {
-        assert_ne!(resource_ddo.token_endpoint.len(), 0);
-        for token_template in item.templates.iter() {
-            assert_ne!(resource_ddo.token_endpoint.get(token_template).unwrap(), "");
-        }
-    }
     assert_ne!(item.templates.len(), 0);
     for token_template in item.templates.iter() {
-        let rt = resource_ddo
-            .token_resource_type
-            .get(token_template)
-            .unwrap_or(&resource_ddo.resource_type);
-        match rt {
-            RT::Other => {
-                assert_eq!(token_template.token_hash.len() as u32, SHA256_SIZE);
-            }
-            RT::RTStaticFile => {
-                if token_template.data_ids.is_none() {
-                    assert_eq!(
-                        token_template.token_hash.len() as u32,
-                        SHA256_SIZE + CRC32_SIZE
-                    );
-                } else {
+        for rt in resource_ddo.token_resource_ty_endpoints.iter() {
+            match rt.resource_type {
+                RT::Other => {
                     assert_eq!(token_template.token_hash.len() as u32, SHA256_SIZE);
+                }
+                RT::RTStaticFile => {
+                    if token_template.data_ids.is_none() {
+                        assert_eq!(
+                            token_template.token_hash.len() as u32,
+                            SHA256_SIZE + CRC32_SIZE
+                        );
+                    } else {
+                        assert_eq!(token_template.token_hash.len() as u32, SHA256_SIZE);
+                    }
                 }
             }
         }
     }
-    if item.templates.len() > 1 {
-        assert!(resource_ddo.desc_hash.is_some())
-    }
+
     let seller = SellerItemInfo::new(item.clone(), resource_ddo.clone());
     database::put(utils::generate_seller_item_info_key(resource_id), seller);
     let mut sink = Sink::new(16);
@@ -187,13 +176,9 @@ fn get_token_templates_endpoint(resource_id: &[u8]) -> Vec<u8> {
             .unwrap();
     let mut sink = Sink::new(64);
     sink.write(item_info.item.templates.len() as u32);
-    for (template, endpoint) in item_info.resource_ddo.token_endpoint.iter() {
-        sink.write(template);
-        if endpoint == "" {
-            sink.write(&item_info.resource_ddo.endpoint);
-        } else {
-            sink.write(endpoint);
-        }
+    for token in item_info.resource_ddo.token_resource_ty_endpoints.iter() {
+        sink.write(&token.token_template);
+        sink.write(&token.endpoint);
     }
     return sink.bytes().to_vec();
 }
