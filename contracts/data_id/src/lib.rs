@@ -16,10 +16,16 @@ struct DataIdInfo {
     data_hash: H256,
 }
 
-fn register_data_id(info: DataIdInfo) -> bool {
-    database::put(utils::generate_data_id_key(info.data_id.as_slice()), info);
+fn register_data_id(info_bytes: &[u8]) -> bool {
+    let mut source = Source::new(info_bytes);
+    let data_id_info: DataIdInfo = source.read().unwrap();
+    database::put(
+        utils::generate_data_id_key(data_id_info.data_id.as_slice()),
+        info_bytes,
+    );
     true
 }
+
 fn get_data_id_info(id: Vec<u8>) -> DataIdInfo {
     database::get::<_, DataIdInfo>(utils::generate_data_id_key(id.as_slice())).unwrap()
 }
@@ -32,8 +38,8 @@ pub fn invoke() {
     let mut sink = Sink::new(12);
     match action {
         b"registerDataId" => {
-            let data_id: DataIdInfo = source.read().unwrap();
-            sink.write(register_data_id(data_id));
+            let data_id_bytes: &[u8] = source.read().unwrap();
+            sink.write(register_data_id(data_id_bytes));
         }
         b"get_data_id_info" => {
             let data_id: Vec<u8> = source.read().unwrap();

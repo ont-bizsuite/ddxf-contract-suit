@@ -64,16 +64,19 @@ fn dtoken_seller_publish(resource_id: &[u8], resource_ddo_bytes: &[u8], item_byt
         for rt in resource_ddo.token_resource_ty_endpoints.iter() {
             match rt.resource_type {
                 RT::Other => {
-                    assert_eq!(token_template.token_hash.len() as u32, SHA256_SIZE);
+                    for token_hash in token_template.token_hash.iter() {
+                        assert_eq!(token_hash.len() as u32, SHA256_SIZE);
+                    }
                 }
                 RT::RTStaticFile => {
                     if token_template.data_ids.is_none() {
-                        assert_eq!(
-                            token_template.token_hash.len() as u32,
-                            SHA256_SIZE + CRC32_SIZE
-                        );
+                        for token_hash in token_template.token_hash.iter() {
+                            assert_eq!(token_hash.len() as u32, SHA256_SIZE + CRC32_SIZE);
+                        }
                     } else {
-                        assert_eq!(token_template.token_hash.len() as u32, SHA256_SIZE);
+                        for token_hash in token_template.token_hash.iter() {
+                            assert_eq!(token_hash.len() as u32, SHA256_SIZE);
+                        }
                     }
                 }
             }
