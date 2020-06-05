@@ -4,7 +4,7 @@ extern crate ontio_std as ostd;
 use ostd::abi::{Decoder, Encoder, Sink, Source};
 use ostd::database;
 use ostd::prelude::*;
-use ostd::runtime::{input, ret};
+use ostd::runtime::{check_witness, input, ret};
 use ostd::types::H256;
 const KEY_DATA_ID: &[u8] = b"01";
 
@@ -14,6 +14,7 @@ struct DataIdInfo {
     data_type: u8,
     data_meta_hash: H256,
     data_hash: H256,
+    owner: Address,
 }
 
 fn register_data_id(info_bytes: &[u8]) -> bool {
@@ -28,6 +29,11 @@ fn register_data_id(info_bytes: &[u8]) -> bool {
 
 fn get_data_id_info(id: Vec<u8>) -> DataIdInfo {
     database::get::<_, DataIdInfo>(utils::generate_data_id_key(id.as_slice())).unwrap()
+}
+
+fn check_owner(data_id: Vec<u8>) -> bool {
+    let info = get_data_id_info(data_id);
+    return check_witness(&info.owner);
 }
 
 #[no_mangle]
@@ -45,9 +51,13 @@ pub fn invoke() {
             let data_id: Vec<u8> = source.read().unwrap();
             sink.write(get_data_id_info(data_id));
         }
+        b"check_owner" => {
+            let data_id: Vec<u8> = source.read().unwrap();
+            sink.write(check_owner(data_id));
+        }
         _ => {
             let method = str::from_utf8(action).ok().unwrap();
-            panic!("not support method:{}", method)
+            panic!("data_id contract not support method:{}", method)
         }
     }
     ret(sink.bytes());
