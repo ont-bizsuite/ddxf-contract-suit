@@ -8,7 +8,7 @@ use ostd::prelude::String;
 #[test]
 fn test_token_template() {
     let tt = TokenTemplate {
-        data_ids: None,
+        data_id: None,
         token_hash: vec![vec![0u8; 32]],
     };
     let mut sink = Sink::new(16);

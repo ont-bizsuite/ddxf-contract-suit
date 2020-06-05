@@ -11,7 +11,7 @@ mod test;
 
 #[derive(Clone, Debug, Ord, Eq, PartialEq, PartialOrd, Encoder, Decoder)]
 pub struct TokenTemplate {
-    pub data_ids: Option<Vec<u8>>,
+    pub data_id: Option<Vec<u8>>,
     pub token_hash: Vec<Vec<u8>>,
 }
 
@@ -29,27 +29,11 @@ impl TokenTemplate {
 }
 
 impl TokenTemplate {
-    pub fn new(data_ids: Option<Vec<u8>>, token_hash: Vec<Vec<u8>>) -> Self {
+    pub fn new(data_id: Option<Vec<u8>>, token_hash: Vec<Vec<u8>>) -> Self {
         TokenTemplate {
-            data_ids,
+            data_id,
             token_hash,
         }
-    }
-
-    pub fn split(&mut self) -> Vec<Vec<u8>> {
-        let mut res: Vec<Vec<u8>> = vec![];
-        let mut item: Vec<u8> = vec![];
-        if let Some(data_ids) = &self.data_ids {
-            for &i in data_ids.iter() {
-                if i == ';' as u8 {
-                    res.push(item.clone());
-                    item.clear();
-                } else {
-                    item.push(i);
-                }
-            }
-        }
-        res
     }
 }
 

@@ -69,7 +69,7 @@ fn dtoken_seller_publish(resource_id: &[u8], resource_ddo_bytes: &[u8], item_byt
                     }
                 }
                 RT::RTStaticFile => {
-                    if token_template.data_ids.is_none() {
+                    if token_template.data_id.is_none() {
                         for token_hash in token_template.token_hash.iter() {
                             assert_eq!(token_hash.len() as u32, SHA256_SIZE + CRC32_SIZE);
                         }
