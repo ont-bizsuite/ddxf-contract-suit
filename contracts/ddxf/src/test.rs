@@ -1,4 +1,5 @@
 use super::*;
+use alloc::collections::btree_map::BTreeMap;
 use hexutil::{read_hex, to_hex};
 use ostd::abi::{Decoder, Encoder};
 use ostd::mock::build_runtime;
@@ -16,6 +17,9 @@ fn test_token_template() {
     let mut source = Source::new(sink.bytes());
     let tt2: TokenTemplate = source.read().unwrap();
     assert_eq!(tt, tt2);
+
+    let bs = read_hex("012c646174615f69645f63316235663139352d623431342d343535632d393464332d6466303565366563373635300120e2a740fa12bd94f0e242688e29f6d803f7671eb1f81bcfbdc1c3e213878e7dd4").unwrap_or_default();
+    let tt = TokenTemplate::from_bytes(bs.as_slice());
 }
 
 #[test]
@@ -108,17 +112,13 @@ fn test4() {
 
 #[test]
 fn serialize() {
-    let mut bmap: BTreeMap<TokenTemplate, RT> = BTreeMap::new();
     let token_hash = read_hex("96cae35ce8a9b0244178bf28e4966c2ce1b8385723a96a6b838858cdd6ca0a1e")
         .unwrap_or_default();
     let token_template = TokenTemplate::new(
         Some(b"did:ont:Abk5rRUyJScnmPEdRdVy4i7ifiU7ygC8Sh".to_vec()),
         vec![token_hash],
     );
-    bmap.insert(token_template.clone(), RT::RTStaticFile);
 
-    let mut token_endpoint = BTreeMap::new();
-    token_endpoint.insert(token_template.clone(), "http://demo.test".to_string());
     let manager = ostd::macros::base58!("ARCESVnP8Lbf6S7FuTei3smA35EQYog4LR");
 
     let mp_contract_address = Address::repeat_byte(3);
@@ -130,13 +130,11 @@ fn serialize() {
         temp[i] = dtoken_contract_hex[i]
     }
     let dtoken_contract = Address::new(temp);
+    let h = H256::repeat_byte(1);
     let ddo = ResourceDDO {
-        resource_type: RT::RTStaticFile,
-        token_resource_type: bmap,
         manager: manager.clone(),
-        endpoint: "endpoint".to_string(),
-        token_endpoint,
-        desc_hash: None,
+        token_resource_ty_endpoints: vec![],
+        item_meta_hash: h,
         dtoken_contract_address: Some(dtoken_contract.clone()),
         mp_contract_address: None,
         split_policy_contract_address: None,
@@ -150,22 +148,16 @@ fn serialize() {
 #[test]
 fn publish() {
     let resource_id = b"resource_id";
-    let mut bmap: BTreeMap<TokenTemplate, RT> = BTreeMap::new();
     let temp = vec![0u8; 36];
     let token_template = TokenTemplate::new(None, vec![temp]);
-    bmap.insert(token_template.clone(), RT::RTStaticFile);
-
     let manager = Address::repeat_byte(1);
     let dtoken_contract_address = Address::repeat_byte(2);
     let mp_contract_address = Address::repeat_byte(3);
 
     let ddo = ResourceDDO {
-        resource_type: RT::RTStaticFile,
-        token_resource_type: bmap,
+        token_resource_ty_endpoints: vec![],
+        item_meta_hash: H256::repeat_byte(1),
         manager: manager.clone(),
-        endpoint: "endpoint".to_string(),
-        token_endpoint: BTreeMap::new(),
-        desc_hash: None,
         dtoken_contract_address: Some(dtoken_contract_address.clone()),
         mp_contract_address: None,
         split_policy_contract_address: None,

@@ -12,7 +12,7 @@ pub struct TokenResourceTyEndpoint {
 
 #[derive(Clone, Encoder, Decoder)]
 pub struct ResourceDDO {
-    pub manager: Address,                                          // data owner id
+    pub managers: Vec<Address>, // data owner id
     pub token_resource_ty_endpoints: Vec<TokenResourceTyEndpoint>, // RT for tokens
     pub item_meta_hash: H256,
     pub dtoken_contract_address: Option<Address>, // can not be empty

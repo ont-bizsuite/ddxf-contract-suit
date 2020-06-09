@@ -5,7 +5,7 @@ use ostd::abi::{Sink, Source};
 use ostd::prelude::*;
 use ostd::runtime::{input, ret};
 
-fn split() -> bool {
+fn split(addrs: Vec<Address>, total: U128) -> bool {
     true
 }
 
@@ -17,7 +17,8 @@ pub fn invoke() {
     let mut sink = Sink::new(12);
     match action {
         b"split" => {
-            sink.write(split());
+            let (addrs, total): (Vec<Address>, U128) = source.read().unwrap();
+            sink.write(split(addrs, total));
         }
         _ => {
             let method = str::from_utf8(action).ok().unwrap();

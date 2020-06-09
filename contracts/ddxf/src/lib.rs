@@ -200,7 +200,7 @@ fn buy_dtoken(resource_id: &[u8], n: U128, buyer_account: &Address) -> bool {
     assert!(sum <= item_info.item.stocks as U128);
     assert!(transfer_fee(
         buyer_account,
-        &item_info.resource_ddo.manager,
+        &item_info.resource_ddo.managers,
         item_info.resource_ddo.mp_contract_address.clone(),
         item_info.resource_ddo.split_policy_contract_address,
         item_info.item.fee.clone(),
@@ -249,6 +249,7 @@ fn use_token(resource_id: &[u8], account: &Address, token_template_bytes: &[u8],
         .bytearray(resource_id)
         .address(account)
         .number(n)
+        .bytearray(token_template_bytes)
         .notify();
     true
 }
@@ -472,7 +473,7 @@ fn migrate(
 
 fn transfer_fee(
     buyer_account: &Address,
-    seller_account: &Address,
+    seller_account: &[Address],
     mp_contract_address: Option<Address>,
     split_contract_address: Option<Address>,
     fee: Fee,

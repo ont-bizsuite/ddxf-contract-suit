@@ -61,6 +61,11 @@ fn generate_dtoken(account: &Address, resource_id: &[u8], templates_bytes: &[u8]
             &token_template.to_bytes(),
             caa.clone(),
         );
+        EventBuilder::new()
+            .string("generateDToken")
+            .string("token_template")
+            .bytearray(&token_template.to_bytes())
+            .notify();
     }
     EventBuilder::new()
         .string("generateDToken")
