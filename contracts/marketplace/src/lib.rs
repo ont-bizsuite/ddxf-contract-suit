@@ -63,12 +63,14 @@ fn transfer_amount(
     ));
 
     //store information that split_contract needs
+    database::put(utils::generate_resource_id_key(split_contract_address),resource_id);
 
-    let mut balance = balance_of(seller_acc, &fee.contract_type);
+
+    let mut balance = balance_of(split_contract_address, &fee.contract_type);
     balance.balance += amt;
     balance.contract_address = Some(fee.contract_addr);
     database::put(
-        utils::generate_balance_key(seller_acc, &fee.contract_type),
+        utils::generate_balance_key(split_contract_address, &fee.contract_type),
         balance,
     );
     true
@@ -79,7 +81,7 @@ fn balance_of(account: &Address, token_type: &TokenType) -> TokenBalance {
         .unwrap_or(TokenBalance::new(token_type.clone()))
 }
 
-fn settle(seller_acc: &Address) -> bool {
+fn settle(seller_acc: &Address, orderId:) -> bool {
     assert!(check_witness(seller_acc));
     let self_addr = address();
     let mp = get_mp_account();

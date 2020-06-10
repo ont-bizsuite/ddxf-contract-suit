@@ -248,6 +248,7 @@ fn buy_dtoken(resource_id: &[u8], n: U128, buyer_account: &Address) -> bool {
     ));
     database::put(utils::generate_seller_item_sold_key(resource_id), sum);
 
+
     let dtoken = get_dtoken_contract();
     assert!(generate_dtoken(
         &item_info

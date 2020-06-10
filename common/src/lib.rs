@@ -9,6 +9,12 @@ use ostd::prelude::*;
 #[cfg(test)]
 mod test;
 
+#[derive(Encoder, Decoder)]
+pub struct OrderId {
+    item_id:Vec<u8>,
+    tx_hash:H256,
+}
+
 #[derive(Clone, Debug, Ord, Eq, PartialEq, PartialOrd, Encoder, Decoder)]
 pub struct TokenTemplate {
     pub data_id: Option<Vec<u8>>,
