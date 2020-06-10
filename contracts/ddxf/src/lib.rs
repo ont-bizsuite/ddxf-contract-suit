@@ -14,7 +14,7 @@ mod dtoken;
 use common::*;
 use dtoken::*;
 use ostd::contract::{ong, ont, wasm};
-use ostd::runtime::{check_witness, contract_migrate};
+use ostd::runtime::{check_witness, contract_migrate, current_txhash};
 
 #[cfg(test)]
 mod test;
@@ -238,7 +238,12 @@ fn buy_dtoken(resource_id: &[u8], n: U128, buyer_account: &Address) -> bool {
     assert!(sold < item_info.item.stocks as U128);
     let sum = sold.checked_add(n).unwrap();
     assert!(sum <= item_info.item.stocks as U128);
+    let oi = OrderId {
+        item_id: resource_id.to_vec(),
+        tx_hash: current_txhash(),
+    };
     assert!(transfer_fee(
+        oi,
         buyer_account,
         &item_info.resource_ddo.managers,
         item_info.resource_ddo.mp_contract_address.clone(),
@@ -247,7 +252,6 @@ fn buy_dtoken(resource_id: &[u8], n: U128, buyer_account: &Address) -> bool {
         n
     ));
     database::put(utils::generate_seller_item_sold_key(resource_id), sum);
-
 
     let dtoken = get_dtoken_contract();
     assert!(generate_dtoken(
@@ -513,6 +517,7 @@ fn migrate(
 }
 
 fn transfer_fee(
+    oi: OrderId,
     buyer_account: &Address,
     seller_account: &Address,
     mp_contract_address: Option<Address>,
@@ -523,7 +528,10 @@ fn transfer_fee(
     if let Some(mp_addr) = mp_contract_address {
         wasm::call_contract(
             &mp_addr,
-            ("transferAmount", (buyer_account, seller_account, fee, n)),
+            (
+                "transferAmount",
+                (oi.to_bytes(), buyer_account, seller_account, fee, n),
+            ),
         );
     } else {
         let amt = n.checked_mul(fee.count as U128).unwrap();

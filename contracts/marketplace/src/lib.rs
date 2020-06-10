@@ -13,7 +13,7 @@ use utils::*;
 mod basic;
 use basic::*;
 extern crate common;
-use common::{Fee, TokenType};
+use common::{Fee, OrderId, TokenType};
 #[cfg(test)]
 mod test;
 
@@ -45,7 +45,7 @@ fn get_fee_split_model(seller_acc: &Address) -> FeeSplitModel {
 }
 
 fn transfer_amount(
-    resource_id: &[u8],
+    order_id_bytes: &[u8],
     buyer_acc: &Address,
     split_contract_address: &Address,
     fee: Fee,
@@ -63,36 +63,54 @@ fn transfer_amount(
     ));
 
     //store information that split_contract needs
-    database::put(utils::generate_resource_id_key(split_contract_address),resource_id);
-
-
-    let mut balance = balance_of(split_contract_address, &fee.contract_type);
-    balance.balance += amt;
-    balance.contract_address = Some(fee.contract_addr);
-    database::put(
-        utils::generate_balance_key(split_contract_address, &fee.contract_type),
-        balance,
-    );
+    let info = SettleInfo {
+        split_contract_addr: split_contract_address.clone(),
+        fee,
+        n,
+    };
+    database::put(utils::generate_balance_key(order_id_bytes), SettleInfo);
     true
 }
 
-fn balance_of(account: &Address, token_type: &TokenType) -> TokenBalance {
-    database::get::<_, TokenBalance>(utils::generate_balance_key(account, token_type))
-        .unwrap_or(TokenBalance::new(token_type.clone()))
+fn get_settle_info(order_id: &[u8]) -> SettleInfo {
+    database::get::<_, SettleInfo>(utils::generate_balance_key(order_id))
+        .unwrap_or(SettleInfo::default())
 }
 
-fn settle(seller_acc: &Address, orderId:) -> bool {
+fn settle(seller_acc: &Address, order_id: &[u8]) -> bool {
     assert!(check_witness(seller_acc));
     let self_addr = address();
     let mp = get_mp_account();
-    let tokens = vec![TokenType::ONG, TokenType::ONT, TokenType::OEP4];
-    for token in tokens.iter() {
-        let balance = balance_of(seller_acc, token);
-        if balance.balance != 0 {
-            assert!(settle_inner(seller_acc, &self_addr, &mp, balance));
-        }
-        database::delete(utils::generate_balance_key(seller_acc, token));
+    let info = get_settle_info(order_id);
+
+    //1. mp
+    let fee_split = get_fee_split_model(seller_acc);
+    let fee = info.fee;
+    let total = info.n.checked_mul(fee.count as U128).unwrap();
+    let mp_fee = total.checked_mul(fee_split.percentage).unwrap();
+    let mp_amt = mp_fee.checked_div(MAX_PERCENTAGE).unwrap();
+    assert!(transfer(
+        &self_addr,
+        &mp,
+        mp_amt,
+        &balance.token_type,
+        balance.contract_address
+    ));
+    //2.split
+    let seller_amt = total.checked_sub(mp_amt).unwrap();
+    let oi = OrderId::from_bytes(order_id);
+    let res = wasm::call_contract(
+        &info.split_contract_addr,
+        ("transferWithdraw", (&self_addr, oi.item_id, seller_amt)),
+    );
+    if let Some(rr) = res {
+        let mut source = Source::new(rr.as_slice());
+        let r: bool = source.read().unwrap();
+        assert!(r);
+    } else {
+        panic!("call split contract failed")
     }
+    database::delete(utils::generate_balance_key(order_id));
     true
 }
 
@@ -116,6 +134,7 @@ fn settle_inner(
         balance.contract_address
     ));
     let seller_amt = balance.balance.checked_sub(mp_amt).unwrap();
+
     assert!(transfer(
         &self_addr,
         seller_acc,
@@ -173,16 +192,22 @@ pub fn invoke() {
             sink.write(get_fee_split_model(seller_acc));
         }
         b"transferAmount" => {
-            let (buyer_acc, seller_acc, fee, n) = source.read().unwrap();
-            sink.write(transfer_amount(buyer_acc, seller_acc, fee, n));
+            let (order_id_bytes, buyer_acc, seller_acc, fee, n) = source.read().unwrap();
+            sink.write(transfer_amount(
+                order_id_bytes,
+                buyer_acc,
+                seller_acc,
+                fee,
+                n,
+            ));
         }
         b"balance_of" => {
-            let (account, token_type) = source.read().unwrap();
-            sink.write(balance_of(account, &token_type));
+            let order_id_bytes = source.read().unwrap();
+            sink.write(get_settle_info(order_id_bytes));
         }
         b"settle" => {
-            let seller_acc = source.read().unwrap();
-            sink.write(settle(seller_acc));
+            let (seller_acc, order_id) = source.read().unwrap();
+            sink.write(settle(seller_acc, order_id));
         }
         b"set_mp" => {
             let mp_addr = source.read().unwrap();

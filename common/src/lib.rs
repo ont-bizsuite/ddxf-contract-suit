@@ -11,8 +11,21 @@ mod test;
 
 #[derive(Encoder, Decoder)]
 pub struct OrderId {
-    item_id:Vec<u8>,
-    tx_hash:H256,
+    pub item_id: Vec<u8>,
+    pub tx_hash: H256,
+}
+
+impl OrderId {
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut sink = Sink::new(64);
+        sink.write(self);
+        sink.bytes().to_vec()
+    }
+    pub fn from_bytes(data: &[u8]) -> OrderId {
+        let mut source = Source::new(data);
+        let oi: OrderId = source.read().unwrap();
+        oi
+    }
 }
 
 #[derive(Clone, Debug, Ord, Eq, PartialEq, PartialOrd, Encoder, Decoder)]

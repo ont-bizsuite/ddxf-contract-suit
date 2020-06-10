@@ -214,6 +214,10 @@ pub fn invoke() {
             let (key, addr): (&[u8], Address) = source.read().unwrap();
             sink.write(withdraw(key, &addr));
         }
+        b"transferWithdraw" => {
+            let (from, key, amt): (Address, &[u8], U128) = source.read().unwrap();
+            sink.write(transfer_withdraw(&from, key, amt));
+        }
         _ => {
             let method = str::from_utf8(action).ok().unwrap();
             panic!("not support method:{}", method)
