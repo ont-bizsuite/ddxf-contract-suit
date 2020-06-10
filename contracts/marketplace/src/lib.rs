@@ -12,6 +12,8 @@ use ostd::contract::{ong, ont, wasm};
 use utils::*;
 mod basic;
 use basic::*;
+extern crate common;
+use common::{Fee, TokenType};
 #[cfg(test)]
 mod test;
 
@@ -42,7 +44,13 @@ fn get_fee_split_model(seller_acc: &Address) -> FeeSplitModel {
         .unwrap_or(FeeSplitModel { percentage: 0 })
 }
 
-fn transfer_amount(buyer_acc: &Address, seller_acc: &Address, fee: Fee, n: U128) -> bool {
+fn transfer_amount(
+    resource_id: &[u8],
+    buyer_acc: &Address,
+    split_contract_address: &Address,
+    fee: Fee,
+    n: U128,
+) -> bool {
     assert!(check_witness(buyer_acc));
     let amt = n.checked_mul(fee.count as U128).unwrap();
     let self_addr = address();
@@ -53,6 +61,9 @@ fn transfer_amount(buyer_acc: &Address, seller_acc: &Address, fee: Fee, n: U128)
         &fee.contract_type,
         Some(fee.contract_addr.clone()),
     ));
+
+    //store information that split_contract needs
+
     let mut balance = balance_of(seller_acc, &fee.contract_type);
     balance.balance += amt;
     balance.contract_address = Some(fee.contract_addr);

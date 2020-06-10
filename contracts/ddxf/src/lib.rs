@@ -25,6 +25,7 @@ const CRC32_SIZE: u32 = 4;
 const KEY_SELLER_ITEM_INFO: &[u8] = b"01";
 const KEY_SELLER_ITEM_SOLD: &[u8] = b"02";
 const KEY_DTOKEN_CONTRACT: &[u8] = b"03";
+const KEY_SPLIT_POLICY_CONTRACT: &[u8] = b"04";
 const KEY_ADMIN: &[u8] = b"04";
 
 const ADMIN: Address = ostd::macros::base58!("AYnhakv7kC9R5ppw65JoE2rt6xDzCjCTvD");
@@ -36,8 +37,26 @@ fn set_dtoken_contract(new_addr: &Address) -> bool {
     true
 }
 
+fn init(dtoken: Address, split_policy: Address) -> bool {
+    assert!(check_witness(&ADMIN));
+    database::put(KEY_DTOKEN_CONTRACT, dtoken);
+    database::put(KEY_SPLIT_POLICY_CONTRACT, split_policy);
+    true
+}
+
 fn get_dtoken_contract() -> Address {
     database::get::<_, Address>(KEY_DTOKEN_CONTRACT).unwrap()
+}
+
+// need admin signature
+fn set_split_policy_contract(new_addr: &Address) -> bool {
+    assert!(check_witness(&ADMIN));
+    database::put(KEY_SPLIT_POLICY_CONTRACT, new_addr);
+    true
+}
+
+fn get_split_policy_contract() -> Address {
+    database::get::<_, Address>(KEY_SPLIT_POLICY_CONTRACT).unwrap()
 }
 
 // need old admin signature
@@ -52,7 +71,12 @@ fn get_admin() -> Address {
     database::get::<_, Address>(KEY_ADMIN).unwrap_or(ADMIN)
 }
 
-fn dtoken_seller_publish(resource_id: &[u8], resource_ddo_bytes: &[u8], item_bytes: &[u8]) -> bool {
+fn dtoken_seller_publish(
+    resource_id: &[u8],
+    resource_ddo_bytes: &[u8],
+    item_bytes: &[u8],
+    split_policy_param_bytes: &[u8],
+) -> bool {
     let resource_ddo = ResourceDDO::from_bytes(resource_ddo_bytes);
     let item = DTokenItem::from_bytes(item_bytes);
     assert!(runtime::check_witness(&resource_ddo.manager));
@@ -85,6 +109,22 @@ fn dtoken_seller_publish(resource_id: &[u8], resource_ddo_bytes: &[u8], item_byt
 
     let seller = SellerItemInfo::new(item.clone(), resource_ddo.clone());
     database::put(utils::generate_seller_item_info_key(resource_id), seller);
+
+    //invoke split_policy contract
+    let split_addr = get_split_policy_contract();
+    let res = wasm::call_contract(
+        &split_addr,
+        ("register", (resource_id, split_policy_param_bytes)),
+    );
+    if let Some(r) = res {
+        let mut source = Source::new(r.as_slice());
+        let rr: bool = source.read().unwrap();
+        assert!(rr);
+    } else {
+        panic!("call split contract register failed");
+    }
+
+    //event
     let mut sink = Sink::new(16);
     sink.write(resource_ddo);
     let mut sink2 = Sink::new(16);
@@ -473,7 +513,7 @@ fn migrate(
 
 fn transfer_fee(
     buyer_account: &Address,
-    seller_account: &[Address],
+    seller_account: &Address,
     mp_contract_address: Option<Address>,
     split_contract_address: Option<Address>,
     fee: Fee,
