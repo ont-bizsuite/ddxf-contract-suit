@@ -45,9 +45,14 @@ fn test() {
 
     let self_addr = Address::repeat_byte(4);
     build.address(&self_addr);
+    oi = OrderId{
+        item_id:vec![0u8,1u8],
+        tx_hash:H256::new([0u8;32]),
+    }
+
     assert!(transfer_amount(&buyer, &seller, fee, 1));
 
-    let seller_balance = balance_of(&seller, &TokenType::ONG);
+    let seller_balance = get_settle_info(&seller, &TokenType::ONG);
     assert_eq!(seller_balance.balance, 1);
 
     build.witness(&[seller.clone()]);
