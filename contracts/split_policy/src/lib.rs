@@ -13,7 +13,7 @@ use ostd::contract::{ong, ont, wasm};
 #[cfg(test)]
 mod test;
 
-const KEY_TOS: &[u8] = b"01";
+const KEY_REGISTRY_PARM: &[u8] = b"01";
 const KEY_BALANCE: &[u8] = b"02";
 
 const TOTAL: U128 = 10000;
@@ -67,7 +67,7 @@ fn register(key: &[u8], param_bytes: &[u8]) -> bool {
     }
     assert!(valid);
     assert_eq!(total, TOTAL);
-    database::put(generate_tos_key(key), param);
+    database::put(generate_registry_param_key(key), param);
     EventBuilder::new()
         .string("register")
         .bytearray(key)
@@ -76,7 +76,8 @@ fn register(key: &[u8], param_bytes: &[u8]) -> bool {
 }
 
 fn get_register_param(key: &[u8]) -> RegisterParam {
-    database::get::<_, RegisterParam>(generate_tos_key(key)).unwrap_or(RegisterParam::default())
+    database::get::<_, RegisterParam>(generate_registry_param_key(key))
+        .unwrap_or(RegisterParam::default())
 }
 
 fn transfer(from: &Address, key: &[u8], amt: U128) -> bool {
@@ -118,13 +119,34 @@ fn withdraw(key: &[u8], addr: &Address) -> bool {
                 rp.contract_addr
             ));
             addr_amt.has_withdraw = true;
-            database::put(generate_tos_key(key), rp);
+            database::put(generate_registry_param_key(key), rp);
             return true;
         } else {
             panic!("has withdraw")
         }
     }
     panic!("not found the addr")
+}
+
+//mp invoke
+fn transfer_withdraw(from: &Address, key: &[u8], amt: U128) -> bool {
+    let mut rp = get_register_param(key);
+    for addr_amt in rp.addr_amt.iter_mut() {
+        if !addr_amt.has_withdraw {
+            let temp = amt.checked_mul(addr_amt.percent).unwrap();
+            let temp = temp.checked_div(TOTAL).unwrap();
+            assert!(transfer_inner(
+                from,
+                &addr_amt.to,
+                temp,
+                &rp.token_type,
+                rp.contract_addr
+            ));
+            addr_amt.has_withdraw = true;
+        }
+    }
+    database::put(generate_registry_param_key(key), rp);
+    true
 }
 
 fn transfer_inner(
@@ -157,8 +179,8 @@ fn transfer_inner(
     true
 }
 
-fn generate_tos_key(key: &[u8]) -> Vec<u8> {
-    [KEY_TOS, key].concat()
+fn generate_registry_param_key(key: &[u8]) -> Vec<u8> {
+    [KEY_REGISTRY_PARM, key].concat()
 }
 
 fn generate_balance_key(key: &[u8]) -> Vec<u8> {
