@@ -29,6 +29,7 @@ const KEY_SPLIT_POLICY_CONTRACT: &[u8] = b"04";
 const KEY_ADMIN: &[u8] = b"05";
 
 const ADMIN: Address = ostd::macros::base58!("AYnhakv7kC9R5ppw65JoE2rt6xDzCjCTvD");
+const DEFAULT_SPLIT_CONTRACT: Address = ostd::macros::base58!("AYnhakv7kC9R5ppw65JoE2rt6xDzCjCTvD");
 
 // need admin signature
 fn set_dtoken_contract(new_addr: &Address) -> bool {
@@ -56,7 +57,7 @@ fn set_split_policy_contract(new_addr: &Address) -> bool {
 }
 
 fn get_split_policy_contract() -> Address {
-    database::get::<_, Address>(KEY_SPLIT_POLICY_CONTRACT).unwrap()
+    database::get::<_, Address>(KEY_SPLIT_POLICY_CONTRACT).unwrap_or(DEFAULT_SPLIT_CONTRACT)
 }
 
 // need old admin signature
