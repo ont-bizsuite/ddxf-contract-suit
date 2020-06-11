@@ -48,8 +48,10 @@ impl RegisterParam {
 }
 
 /// register the dividend distribution strategy on the chain
-/// key is also called resource_id in the other contract, used to mark the uniqueness of dividend strategy
-/// param_bytes is the serialization result of RegisterParam
+///
+/// `key` is also called resource_id in the other contract, used to mark the uniqueness of dividend strategy
+///
+/// `param_bytes` is the serialization result of RegisterParam
 pub fn register(key: &[u8], param_bytes: &[u8]) -> bool {
     let param = RegisterParam::from_bytes(param_bytes);
     let data = storage_read(key.as_ref()).map(|val: Vec<u8>| val);
@@ -105,8 +107,10 @@ pub fn get_balance(key: &[u8]) -> U128 {
 }
 
 /// the data owner withdraw token from the contract
-/// key is also called resource_id in the other contract
-/// addr is the address who withdraw token, need the address signature
+///
+/// `key` is also called resource_id in the other contract
+///
+/// `addr` is the address who withdraw token, need the address signature
 pub fn withdraw(key: &[u8], addr: &Address) -> bool {
     assert!(check_witness(addr));
     let mut rp = get_register_param(key);

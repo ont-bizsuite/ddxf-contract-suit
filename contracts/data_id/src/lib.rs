@@ -33,7 +33,8 @@ impl DataIdInfo {
 }
 
 /// register data id info on the block chain, need one of the owners signature
-/// info_bytes is the result of DataIdInfo struct
+///
+/// `info_bytes` is the result of DataIdInfo struct
 pub fn register_data_id(info_bytes: &[u8]) -> bool {
     let mut source = Source::new(info_bytes);
     let data_id_info: DataIdInfo = source.read().unwrap();

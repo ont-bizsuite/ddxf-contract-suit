@@ -24,6 +24,7 @@ const KEY_ADMIN: &[u8] = b"03";
 const ADMIN: Address = ostd::macros::base58!("AYnhakv7kC9R5ppw65JoE2rt6xDzCjCTvD");
 
 /// set ddxf contract address, need admin signature
+///
 /// only ddxf contract has the right to invoke some method
 fn set_ddxf_contract(new_addr: &Address) -> bool {
     let admin = get_admin();
@@ -38,6 +39,7 @@ fn get_ddxf_contract() -> Address {
 }
 
 /// update admin address
+///
 /// need old admin signature
 fn update_admin(new_admin: &Address) -> bool {
     let old_admin = get_admin();
@@ -52,11 +54,16 @@ fn get_admin() -> Address {
 }
 
 /// generate dtoken
+///
 /// when the user calls buy dtoken in ddxf contract, ddxf contract will call the generate_dtoken method of the contract to generate dtoken for the buyer
-/// account is the buyer address
-/// resource_id used to mark the only commodity in the chain
-/// token_template_bytes used to mark the only token
-/// n represents the number of generate tokens
+///
+/// `account` is the buyer address
+///
+/// `resource_id` used to mark the only commodity in the chain
+///
+/// `token_template_bytes` used to mark the only token
+///
+/// `n` represents the number of generate tokens
 pub fn generate_dtoken(
     account: &Address,
     resource_id: &[u8],
@@ -93,10 +100,14 @@ pub fn generate_dtoken(
 }
 
 /// use token, the buyer of the token has the right to consume the token
-/// account is the buyer address
-/// resource_id used to mark the only commodity in the chain
-/// token_template_bytes used to mark the only token
-/// n represents the number of consuming token
+///
+/// `account` is the buyer address
+///
+/// `resource_id` used to mark the only commodity in the chain
+///
+/// `token_template_bytes` used to mark the only token
+///
+/// `n` represents the number of consuming token
 pub fn use_token(
     account: &Address,
     resource_id: &[u8],
@@ -123,11 +134,16 @@ pub fn use_token(
 }
 
 /// use token by agent, the agent of the token has the right to invoke this method
-/// account is the buyer address
-/// agent is the authorized address
-/// resource_id used to mark the only commodity in the chain
-/// token_template_bytes used to mark the only token
-/// n represents the number of consuming token
+///
+/// `account` is the buyer address
+///
+/// `agent` is the authorized address
+///
+/// `resource_id` used to mark the only commodity in the chain
+///
+/// `token_template_bytes` used to mark the only token
+///
+/// `n` represents the number of consuming token
 pub fn use_token_by_agent(
     account: &Address,
     agent: &Address,
@@ -184,11 +200,16 @@ pub fn transfer_dtoken(
 }
 
 /// set agents, this method will set agents more than one TokeTemplate
-/// account is the buyer address
-/// resource_id used to mark the only commodity in the chain
-/// agents is the array of address who will be authorized agents
-/// n represents the number of authorized token
-/// token_template_bytes is array of TokenTemplate
+///
+/// `account` is the buyer address
+///
+/// `resource_id` used to mark the only commodity in the chain
+///
+/// `agents` is the array of address who will be authorized agents
+///
+/// `n` represents the number of authorized token
+///
+/// `token_template_bytes` is array of TokenTemplate
 pub fn set_agents(
     account: &Address,
     resource_id: &[u8],
@@ -212,11 +233,16 @@ pub fn set_agents(
 }
 
 /// set token agents
-/// account is the buyer address
-/// resource_id used to mark the only commodity in the chain
-/// token_template_bytes used to mark the only token
-/// agents is the array of address who will be authorized as agents
-/// n represents the number of authorized token
+///
+/// `account` is the buyer address
+///
+/// `resource_id` used to mark the only commodity in the chain
+///
+/// `token_template_bytes` used to mark the only token
+///
+/// `agents` is the array of address who will be authorized as agents
+///
+/// `n` represents the number of authorized token
 pub fn set_token_agents(
     account: &Address,
     resource_id: &[u8],
@@ -238,10 +264,14 @@ pub fn set_token_agents(
 }
 
 /// add_agents, this method append agents for the all token
-/// resource_id used to mark the only commodity in the chain
-/// account is user address who authorize the other address is agent, need account signature
-/// agents is the array of agent address
-/// n is number of authorizations per agent
+///
+/// `resource_id` used to mark the only commodity in the chain
+///
+/// `account` is user address who authorize the other address is agent, need account signature
+///
+/// `agents` is the array of agent address
+///
+/// `n` is number of authorizations per agent
 pub fn add_agents(
     account: &Address,
     resource_id: &[u8],
@@ -265,11 +295,16 @@ pub fn add_agents(
 }
 
 /// add_agents, this method only append agents for the specified token.
-/// resource_id used to mark the only commodity in the chain
-/// account is user address who authorize the other address is agent, need account signature
-/// token_template_bytes used to specified which token to set agents.
-/// agents is the array of agent address
-/// n is number of authorizations per agent
+///
+/// `resource_id` used to mark the only commodity in the chain
+///
+/// `account` is user address who authorize the other address is agent, need account signature
+///
+/// `token_template_bytes` used to specified which token to set agents.
+///
+/// `agents` is the array of agent address
+///
+/// `n` is number of authorizations per agent
 pub fn add_token_agents(
     account: &Address,
     resource_id: &[u8],
@@ -291,10 +326,14 @@ pub fn add_token_agents(
 }
 
 /// product owner remove all the agents
-/// account is user address who authorize the other address is agent, need account signature
-/// resource_id used to mark the only commodity in the chain
-/// agents is the array of agent address which will be removed by account
-/// token_templates_bytes the serialization result is array of TokenTemplate
+///
+/// `account` is user address who authorize the other address is agent, need account signature
+///
+/// `resource_id` used to mark the only commodity in the chain
+///
+/// `agents` is the array of agent address which will be removed by account
+///
+/// `token_templates_bytes` the serialization result is array of TokenTemplate
 pub fn remove_agents(
     account: &Address,
     resource_id: &[u8],
@@ -316,10 +355,14 @@ pub fn remove_agents(
 }
 
 /// product owner remove the agents of specified token
-/// account is user address who authorize the other address is agent, need account signature
-/// resource_id used to mark the only commodity in the chain
-/// token_template_bytes is the serialization result of TokenTemplate
-/// agents is the array of agent address which will be removed by account
+///
+/// `account` is user address who authorize the other address is agent, need account signature
+///
+/// `resource_id` used to mark the only commodity in the chain
+///
+/// `token_template_bytes` is the serialization result of
+///
+/// `agents` is the array of agent address which will be removed by account
 pub fn remove_token_agents(
     account: &Address,
     resource_id: &[u8],

@@ -1,3 +1,15 @@
+//! ddxf contract
+//!
+//! User publishing process
+//!
+//! user only need invoke `dtoken_seller_publish` method to publish products
+//!
+//! User purchase and use process
+//!
+//! first of all, users should invoke `buyDtoken` method to buy the released products first
+//!
+//! Second user invoke the `useToken` method to consume token
+
 #![cfg_attr(not(feature = "mock"), no_std)]
 #![feature(proc_macro_hygiene)]
 extern crate alloc;
@@ -36,6 +48,7 @@ const DEFAULT_DTOKEN_CONTRACT: Address =
 /// set dtoken contract address as the default dtoken contract address,
 /// ddxf contract will invoke dtoken contract to pay the fee
 /// need admin signature
+/// `new_addr` is the new dtoken contract address
 pub fn set_dtoken_contract(new_addr: &Address) -> bool {
     assert!(check_witness(&ADMIN));
     database::put(KEY_DTOKEN_CONTRACT, new_addr);
@@ -57,7 +70,9 @@ pub fn get_dtoken_contract() -> Address {
 }
 
 /// set split contract address as the default split contract address,
+///
 /// When there are multiple data owners, split contract is used to set the income distribution strategy.
+///
 /// need admin signature
 pub fn set_split_policy_contract(new_addr: &Address) -> bool {
     assert!(check_witness(&ADMIN));
@@ -71,6 +86,7 @@ fn get_split_policy_contract() -> Address {
 }
 
 /// need old admin signature
+///
 /// update the admin address, admin has the right to set the default dtoken and split contract address
 fn update_admin(new_admin: &Address) -> bool {
     let old_admin = get_admin();
@@ -85,10 +101,15 @@ fn get_admin() -> Address {
 }
 
 /// seller publish product, need seller signature
-/// resource_id used to mark the only commodity in the chain
-/// resource_ddo_bytes is the result of ResourceDDO struct serialization
-/// item_bytes is the result of DTokenItem struct serialization
-/// split_policy_param_bytes is the result of RegisterParam struct serialization
+///
+/// `resource_id` used to mark the only commodity in the chain
+///
+/// `resource_ddo_bytes` is the result of ResourceDDO struct serialization
+///
+/// `item_bytes` is the result of DTokenItem struct serialization
+///
+/// `split_policy_param_bytes` is the result of RegisterParam struct serialization
+///
 /// # Example
 /// ```no_run
 /// use common::{Fee,TokenType};
@@ -188,11 +209,16 @@ pub fn dtoken_seller_publish(
 }
 
 /// buy dtoken from reseller
+///
 /// The seller can sell what he bought before he used it
-/// resource_id used to mark the only commodity in the chain,
-/// n is the number of purchases
-/// buyer_account is buyer address, need this address signature
-/// reseller_account is reseller address, need this address signature
+///
+/// `resource_id` used to mark the only commodity in the chain
+///
+/// `n` is the number of purchases
+///
+/// `buyer_account` is buyer address, need this address signature
+///
+/// `reseller_account` is reseller address, need this address signature
 pub fn buy_dtoken_from_reseller(
     resource_id: &[u8],
     n: U128,
@@ -242,9 +268,12 @@ pub fn buy_dtoken_from_reseller(
 }
 
 /// Buy more than one dtoken at a time
-/// resource_ids is array of resource_id which used to mark the only commodity in the chain
-/// ns is array of n which is the number of purchases. the length of resource_ids must be the same with the length of ns.
-/// buyer is buyer address, need this address signature
+///
+/// `resource_ids` is array of resource_id which used to mark the only commodity in the chain
+///
+/// `ns` is array of n which is the number of purchases. the length of resource_ids must be the same with the length of ns.
+///
+/// `buyer_account` is buyer address, need this address signature
 pub fn buy_dtokens(resource_ids: Vec<&[u8]>, ns: Vec<U128>, buyer_account: &Address) -> bool {
     let l = resource_ids.len();
     assert_eq!(l, ns.len());
@@ -254,7 +283,7 @@ pub fn buy_dtokens(resource_ids: Vec<&[u8]>, ns: Vec<U128>, buyer_account: &Addr
     true
 }
 
-pub fn buy_dtokens_and_set_agents(
+fn buy_dtokens_and_set_agents(
     resource_ids: Vec<&[u8]>,
     ns: Vec<U128>,
     use_index: U128,
@@ -285,7 +314,7 @@ pub fn buy_dtokens_and_set_agents(
     true
 }
 
-pub fn get_token_templates_endpoint(resource_id: &[u8]) -> Vec<u8> {
+fn get_token_templates_endpoint(resource_id: &[u8]) -> Vec<u8> {
     let item_info =
         database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
             .unwrap();
@@ -298,9 +327,12 @@ pub fn get_token_templates_endpoint(resource_id: &[u8]) -> Vec<u8> {
     return sink.bytes().to_vec();
 }
 /// buy dtoken
-/// resource_id used to mark the only commodity in the chain,
-/// n is the number of purchases
-/// buyer_account is buyer address, need this address signature
+///
+/// `resource_id` used to mark the only commodity in the chain
+///
+/// `n` is the number of purchases
+///
+/// `buyer_account` is buyer address, need this address signature
 pub fn buy_dtoken(resource_id: &[u8], n: U128, buyer_account: &Address) -> bool {
     assert!(runtime::check_witness(buyer_account));
     let item_info =
@@ -351,10 +383,14 @@ pub fn buy_dtoken(resource_id: &[u8], n: U128, buyer_account: &Address) -> bool 
 }
 
 /// use dtoken, after buy dtoken, user can consume the token
-/// resource_id used to mark the only commodity in the chain
-/// account is the address who consume token, need the address signature
-/// token_template_bytes used to mark the only token user consume
-/// n is the number of consuming
+///
+/// `resource_id` used to mark the only commodity in the chain
+///
+/// `account` is the address who consume token, need the address signature
+///
+/// `token_template_bytes` used to mark the only token user consume
+///
+/// `n` is the number of consuming
 pub fn use_token(
     resource_id: &[u8],
     account: &Address,
@@ -387,11 +423,16 @@ pub fn use_token(
 }
 
 /// consume token by agent
-/// resource_id used to mark the only commodity in the chain
-/// account is buyer address, need the address signature
-/// agent is the agent address who is authored to consume token
-/// token_template_bytes used to mark the only token user consume
-/// n is the number of consuming
+///
+/// `resource_id` used to mark the only commodity in the chain
+///
+/// `account` is buyer address, need the address signature
+///
+/// `agent` is the agent address who is authored to consume token
+///
+/// `token_template_bytes` used to mark the only token user consume
+///
+/// `n` is the number of consuming
 pub fn use_token_by_agent(
     resource_id: &[u8],
     account: &Address,
@@ -426,10 +467,14 @@ pub fn use_token_by_agent(
 }
 
 /// set agent
-/// resource_id used to mark the only commodity in the chain
-/// account is user address who authorize the other address is agent, need account signature
-/// agent is the array of agent address
-/// n is number of authorizations per agent
+///
+/// `resource_id` used to mark the only commodity in the chain
+///
+/// `account` is user address who authorize the other address is agent, need account signature
+///
+/// `agent` is the array of agent address
+///
+/// `n` is number of authorizations per agent
 pub fn set_agents(resource_id: &[u8], account: &Address, agents: Vec<&Address>, n: U128) -> bool {
     assert!(runtime::check_witness(account));
     let item_info =
@@ -451,11 +496,16 @@ pub fn set_agents(resource_id: &[u8], account: &Address, agents: Vec<&Address>, 
 }
 
 /// set token agents, this method will clear the old agents
-/// resource_id used to mark the only commodity in the chain
-/// account is user address who authorize the other address is agent, need account signature
-/// agents is the array of agent address
-/// template_bytes used to mark the only token user consume
-/// n is number of authorizations per agent
+///
+/// `resource_id` used to mark the only commodity in the chain
+///
+/// `account is` user address who authorize the other address is agent, need account signature
+///
+/// `agents` is the array of agent address
+///
+/// `template_bytes` used to mark the only token user consume
+///
+/// `n` is number of authorizations per agent
 pub fn set_token_agents(
     resource_id: &[u8],
     account: &Address,
@@ -489,10 +539,14 @@ pub fn set_token_agents(
 }
 
 /// add_agents, this method only append agents for the all token
-/// resource_id used to mark the only commodity in the chain
-/// account is user address who authorize the other address is agent, need account signature
-/// agents is the array of agent address
-/// n is number of authorizations per agent
+///
+/// `resource_id` used to mark the only commodity in the chain
+///
+/// `account` is user address who authorize the other address is agent, need account signature
+///
+/// `agents` is the array of agent address
+///
+/// `n` is number of authorizations per agent
 pub fn add_agents(resource_id: &[u8], account: &Address, agents: Vec<&Address>, n: U128) -> bool {
     assert!(runtime::check_witness(account));
     let item_info =
@@ -520,11 +574,16 @@ pub fn add_agents(resource_id: &[u8], account: &Address, agents: Vec<&Address>, 
 }
 
 /// add_agents, this method only append agents for the specified token.
-/// resource_id used to mark the only commodity in the chain
-/// account is user address who authorize the other address is agent, need account signature
-/// token_template_bytes used to specified which token to set agents.
-/// agents is the array of agent address
-/// n is number of authorizations per agent
+///
+/// `resource_id` used to mark the only commodity in the chain
+///
+/// `account` is user address who authorize the other address is agent, need account signature
+///
+/// `token_template_bytes` used to specified which token to set agents.
+///
+/// `agents` is the array of agent address
+///
+/// `n` is number of authorizations per agent
 pub fn add_token_agents(
     resource_id: &[u8],
     account: &Address,
@@ -558,9 +617,12 @@ pub fn add_token_agents(
 }
 
 /// product owner remove all the agents
-/// resource_id used to mark the only commodity in the chain
-/// account is user address who authorize the other address is agent, need account signature
-/// agents is the array of agent address which will be removed by account
+///
+/// `resource_id` used to mark the only commodity in the chain
+///
+/// `account` is user address who authorize the other address is agent, need account signature
+///
+/// `agents` is the array of agent address which will be removed by account
 pub fn remove_agents(resource_id: &[u8], account: &Address, agents: Vec<&Address>) -> bool {
     assert!(runtime::check_witness(account));
     let item_info =
@@ -586,9 +648,12 @@ pub fn remove_agents(resource_id: &[u8], account: &Address, agents: Vec<&Address
 }
 
 /// product owner remove the agents of specified token
-/// resource_id used to mark the only commodity in the chain
-/// account is user address who authorize the other address is agent, need account signature
-/// agents is the array of agent address which will be removed by account
+///
+/// `resource_id` used to mark the only commodity in the chain
+///
+/// `account` is user address who authorize the other address is agent, need account signature
+///
+/// `agents` is the array of agent address which will be removed by account
 pub fn remove_token_agents(
     resource_id: &[u8],
     token_template_bytes: &[u8],
