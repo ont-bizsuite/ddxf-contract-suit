@@ -12,7 +12,7 @@ use common::RT;
 const KEY_DATA_ID: &[u8] = b"01";
 
 #[derive(Encoder, Decoder)]
-struct DataIdInfo {
+pub struct DataIdInfo {
     data_id: Vec<u8>,     //used to uniquely mark a piece of data
     data_type: RT,        // data type, contains static data type and other type.
     data_meta_hash: H256, //data meta is meta information of data, data meta hash is the sha256 of data meta
@@ -34,7 +34,7 @@ impl DataIdInfo {
 
 /// register data id info on the block chain, need one of the owners signature
 /// info_bytes is the result of DataIdInfo struct
-fn register_data_id(info_bytes: &[u8]) -> bool {
+pub fn register_data_id(info_bytes: &[u8]) -> bool {
     let mut source = Source::new(info_bytes);
     let data_id_info: DataIdInfo = source.read().unwrap();
     assert!(data_id_info.owners.len() >= 1);
@@ -59,13 +59,13 @@ fn register_data_id(info_bytes: &[u8]) -> bool {
 }
 
 /// query data id info by data id
-fn get_data_id_info(id: Vec<u8>) -> DataIdInfo {
+pub fn get_data_id_info(id: Vec<u8>) -> DataIdInfo {
     database::get::<_, DataIdInfo>(utils::generate_data_id_key(id.as_slice()))
         .unwrap_or(DataIdInfo::default())
 }
 
 /// verify data id owner signature
-fn check_owner(data_id: Vec<u8>) -> bool {
+pub fn check_owner(data_id: Vec<u8>) -> bool {
     let info = get_data_id_info(data_id);
     let mut valid = false;
     for owner in info.owners.iter() {

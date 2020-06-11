@@ -36,7 +36,7 @@ const DEFAULT_DTOKEN_CONTRACT: Address =
 /// set dtoken contract address as the default dtoken contract address,
 /// ddxf contract will invoke dtoken contract to pay the fee
 /// need admin signature
-fn set_dtoken_contract(new_addr: &Address) -> bool {
+pub fn set_dtoken_contract(new_addr: &Address) -> bool {
     assert!(check_witness(&ADMIN));
     database::put(KEY_DTOKEN_CONTRACT, new_addr);
     true
@@ -44,7 +44,7 @@ fn set_dtoken_contract(new_addr: &Address) -> bool {
 
 /// init contract
 /// set dtoken and split contract address
-fn init(dtoken: Address, split_policy: Address) -> bool {
+pub fn init(dtoken: Address, split_policy: Address) -> bool {
     assert!(check_witness(&ADMIN));
     database::put(KEY_DTOKEN_CONTRACT, dtoken);
     database::put(KEY_SPLIT_POLICY_CONTRACT, split_policy);
@@ -52,14 +52,14 @@ fn init(dtoken: Address, split_policy: Address) -> bool {
 }
 
 /// query the default dtoken contract address
-fn get_dtoken_contract() -> Address {
+pub fn get_dtoken_contract() -> Address {
     database::get::<_, Address>(KEY_DTOKEN_CONTRACT).unwrap_or(DEFAULT_DTOKEN_CONTRACT)
 }
 
 /// set split contract address as the default split contract address,
 /// When there are multiple data owners, split contract is used to set the income distribution strategy.
 /// need admin signature
-fn set_split_policy_contract(new_addr: &Address) -> bool {
+pub fn set_split_policy_contract(new_addr: &Address) -> bool {
     assert!(check_witness(&ADMIN));
     database::put(KEY_SPLIT_POLICY_CONTRACT, new_addr);
     true
@@ -116,14 +116,14 @@ fn get_admin() -> Address {
 ///        templates,
 ///    };
 ///  let split_param = b"test";
-///  assert!(dtoken_seller_publish(
+///  assert!(supper::dtoken_seller_publish(
 ///        resource_id,
 ///        &ddo.to_bytes(),
 ///        &dtoken_item.to_bytes(),
 ///        split_param
 ///    ));
 /// ```
-fn dtoken_seller_publish(
+pub fn dtoken_seller_publish(
     resource_id: &[u8],
     resource_ddo_bytes: &[u8],
     item_bytes: &[u8],
@@ -193,7 +193,7 @@ fn dtoken_seller_publish(
 /// n is the number of purchases
 /// buyer_account is buyer address, need this address signature
 /// reseller_account is reseller address, need this address signature
-fn buy_dtoken_from_reseller(
+pub fn buy_dtoken_from_reseller(
     resource_id: &[u8],
     n: U128,
     buyer_account: &Address,
@@ -245,7 +245,7 @@ fn buy_dtoken_from_reseller(
 /// resource_ids is array of resource_id which used to mark the only commodity in the chain
 /// ns is array of n which is the number of purchases. the length of resource_ids must be the same with the length of ns.
 /// buyer is buyer address, need this address signature
-fn buy_dtokens(resource_ids: Vec<&[u8]>, ns: Vec<U128>, buyer_account: &Address) -> bool {
+pub fn buy_dtokens(resource_ids: Vec<&[u8]>, ns: Vec<U128>, buyer_account: &Address) -> bool {
     let l = resource_ids.len();
     assert_eq!(l, ns.len());
     for i in 0..l {
@@ -254,7 +254,7 @@ fn buy_dtokens(resource_ids: Vec<&[u8]>, ns: Vec<U128>, buyer_account: &Address)
     true
 }
 
-fn buy_dtokens_and_set_agents(
+pub fn buy_dtokens_and_set_agents(
     resource_ids: Vec<&[u8]>,
     ns: Vec<U128>,
     use_index: U128,
@@ -285,7 +285,7 @@ fn buy_dtokens_and_set_agents(
     true
 }
 
-fn get_token_templates_endpoint(resource_id: &[u8]) -> Vec<u8> {
+pub fn get_token_templates_endpoint(resource_id: &[u8]) -> Vec<u8> {
     let item_info =
         database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
             .unwrap();
@@ -301,7 +301,7 @@ fn get_token_templates_endpoint(resource_id: &[u8]) -> Vec<u8> {
 /// resource_id used to mark the only commodity in the chain,
 /// n is the number of purchases
 /// buyer_account is buyer address, need this address signature
-fn buy_dtoken(resource_id: &[u8], n: U128, buyer_account: &Address) -> bool {
+pub fn buy_dtoken(resource_id: &[u8], n: U128, buyer_account: &Address) -> bool {
     assert!(runtime::check_witness(buyer_account));
     let item_info =
         database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
@@ -355,7 +355,12 @@ fn buy_dtoken(resource_id: &[u8], n: U128, buyer_account: &Address) -> bool {
 /// account is the address who consume token, need the address signature
 /// token_template_bytes used to mark the only token user consume
 /// n is the number of consuming
-fn use_token(resource_id: &[u8], account: &Address, token_template_bytes: &[u8], n: U128) -> bool {
+pub fn use_token(
+    resource_id: &[u8],
+    account: &Address,
+    token_template_bytes: &[u8],
+    n: U128,
+) -> bool {
     assert!(runtime::check_witness(account));
     let item_info =
         database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
@@ -387,7 +392,7 @@ fn use_token(resource_id: &[u8], account: &Address, token_template_bytes: &[u8],
 /// agent is the agent address who is authored to consume token
 /// token_template_bytes used to mark the only token user consume
 /// n is the number of consuming
-fn use_token_by_agent(
+pub fn use_token_by_agent(
     resource_id: &[u8],
     account: &Address,
     agent: &Address,
@@ -425,7 +430,7 @@ fn use_token_by_agent(
 /// account is user address who authorize the other address is agent, need account signature
 /// agent is the array of agent address
 /// n is number of authorizations per agent
-fn set_agents(resource_id: &[u8], account: &Address, agents: Vec<&Address>, n: U128) -> bool {
+pub fn set_agents(resource_id: &[u8], account: &Address, agents: Vec<&Address>, n: U128) -> bool {
     assert!(runtime::check_witness(account));
     let item_info =
         database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
@@ -451,7 +456,7 @@ fn set_agents(resource_id: &[u8], account: &Address, agents: Vec<&Address>, n: U
 /// agents is the array of agent address
 /// template_bytes used to mark the only token user consume
 /// n is number of authorizations per agent
-fn set_token_agents(
+pub fn set_token_agents(
     resource_id: &[u8],
     account: &Address,
     agents: Vec<Address>,
@@ -488,7 +493,7 @@ fn set_token_agents(
 /// account is user address who authorize the other address is agent, need account signature
 /// agents is the array of agent address
 /// n is number of authorizations per agent
-fn add_agents(resource_id: &[u8], account: &Address, agents: Vec<&Address>, n: U128) -> bool {
+pub fn add_agents(resource_id: &[u8], account: &Address, agents: Vec<&Address>, n: U128) -> bool {
     assert!(runtime::check_witness(account));
     let item_info =
         database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
@@ -520,7 +525,7 @@ fn add_agents(resource_id: &[u8], account: &Address, agents: Vec<&Address>, n: U
 /// token_template_bytes used to specified which token to set agents.
 /// agents is the array of agent address
 /// n is number of authorizations per agent
-fn add_token_agents(
+pub fn add_token_agents(
     resource_id: &[u8],
     account: &Address,
     token_template_bytes: &[u8],
@@ -556,7 +561,7 @@ fn add_token_agents(
 /// resource_id used to mark the only commodity in the chain
 /// account is user address who authorize the other address is agent, need account signature
 /// agents is the array of agent address which will be removed by account
-fn remove_agents(resource_id: &[u8], account: &Address, agents: Vec<&Address>) -> bool {
+pub fn remove_agents(resource_id: &[u8], account: &Address, agents: Vec<&Address>) -> bool {
     assert!(runtime::check_witness(account));
     let item_info =
         database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
@@ -584,7 +589,7 @@ fn remove_agents(resource_id: &[u8], account: &Address, agents: Vec<&Address>) -
 /// resource_id used to mark the only commodity in the chain
 /// account is user address who authorize the other address is agent, need account signature
 /// agents is the array of agent address which will be removed by account
-fn remove_token_agents(
+pub fn remove_token_agents(
     resource_id: &[u8],
     token_template_bytes: &[u8],
     account: &Address,

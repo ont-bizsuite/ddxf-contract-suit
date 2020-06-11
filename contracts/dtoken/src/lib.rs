@@ -57,7 +57,12 @@ fn get_admin() -> Address {
 /// resource_id used to mark the only commodity in the chain
 /// token_template_bytes used to mark the only token
 /// n represents the number of generate tokens
-fn generate_dtoken(account: &Address, resource_id: &[u8], templates_bytes: &[u8], n: U128) -> bool {
+pub fn generate_dtoken(
+    account: &Address,
+    resource_id: &[u8],
+    templates_bytes: &[u8],
+    n: U128,
+) -> bool {
     let mut source = Source::new(templates_bytes);
     let templates: Vec<TokenTemplate> = source.read().unwrap();
     check_caller();
@@ -155,7 +160,7 @@ pub fn use_token_by_agent(
     true
 }
 
-fn transfer_dtoken(
+pub fn transfer_dtoken(
     from_account: &Address,
     to_account: &Address,
     resource_id: &[u8],
@@ -184,7 +189,7 @@ fn transfer_dtoken(
 /// agents is the array of address who will be authorized agents
 /// n represents the number of authorized token
 /// token_template_bytes is array of TokenTemplate
-fn set_agents(
+pub fn set_agents(
     account: &Address,
     resource_id: &[u8],
     agents: Vec<Address>,
@@ -212,7 +217,7 @@ fn set_agents(
 /// token_template_bytes used to mark the only token
 /// agents is the array of address who will be authorized as agents
 /// n represents the number of authorized token
-fn set_token_agents(
+pub fn set_token_agents(
     account: &Address,
     resource_id: &[u8],
     token_template_bytes: &[u8],
@@ -237,7 +242,7 @@ fn set_token_agents(
 /// account is user address who authorize the other address is agent, need account signature
 /// agents is the array of agent address
 /// n is number of authorizations per agent
-fn add_agents(
+pub fn add_agents(
     account: &Address,
     resource_id: &[u8],
     agents: Vec<Address>,
@@ -265,7 +270,7 @@ fn add_agents(
 /// token_template_bytes used to specified which token to set agents.
 /// agents is the array of agent address
 /// n is number of authorizations per agent
-fn add_token_agents(
+pub fn add_token_agents(
     account: &Address,
     resource_id: &[u8],
     token_template_bytes: &[u8],
@@ -290,7 +295,7 @@ fn add_token_agents(
 /// resource_id used to mark the only commodity in the chain
 /// agents is the array of agent address which will be removed by account
 /// token_templates_bytes the serialization result is array of TokenTemplate
-fn remove_agents(
+pub fn remove_agents(
     account: &Address,
     resource_id: &[u8],
     agents: Vec<Address>,
@@ -315,7 +320,7 @@ fn remove_agents(
 /// resource_id used to mark the only commodity in the chain
 /// token_template_bytes is the serialization result of TokenTemplate
 /// agents is the array of agent address which will be removed by account
-fn remove_token_agents(
+pub fn remove_token_agents(
     account: &Address,
     resource_id: &[u8],
     token_template_bytes: &[u8],

@@ -25,7 +25,9 @@ fn set_mp(mp_account: &Address) -> bool {
     database::put(utils::KEY_MP, mp_account);
     true
 }
-
+/// set charging model, need mp and seller signature
+/// seller_acc is seller address
+/// fee_split_model is the charging model that is agreed by the seller and MP
 fn set_fee_split_model(seller_acc: &Address, fee_split_model: FeeSplitModel) -> bool {
     assert!(fee_split_model.percentage <= MAX_PERCENTAGE as u16);
     let mp = get_mp_account();
@@ -39,11 +41,18 @@ fn set_fee_split_model(seller_acc: &Address, fee_split_model: FeeSplitModel) -> 
     true
 }
 
+/// query seller's charging model
 fn get_fee_split_model(seller_acc: &Address) -> FeeSplitModel {
     database::get::<_, FeeSplitModel>(utils::generate_fee_split_model_key(seller_acc))
         .unwrap_or(FeeSplitModel { percentage: 0 })
 }
 
+/// transfer fee to the contract and register the income distribution balance of this order
+/// order_id_bytes is the serialization result of OrderId
+/// buyer_acc is buyer address
+/// split_contract_address is split contract address which register the distribution strategy
+/// fee is the cost of one share
+/// n is the number of shares purchased
 fn transfer_amount(
     order_id_bytes: &[u8],
     buyer_acc: &Address,
@@ -72,11 +81,15 @@ fn transfer_amount(
     true
 }
 
+/// query settle info by order id
 fn get_settle_info(order_id: &[u8]) -> SettleInfo {
     database::get::<_, SettleInfo>(utils::generate_balance_key(order_id))
         .unwrap_or(SettleInfo::default())
 }
 
+/// expense settlement, first transfer fee to mp, second invoke "transferWithdraw" method of split contract
+/// seller_acc is the seller address, need the address signature
+/// order_id is the serialization result of OrderId
 fn settle(seller_acc: &Address, order_id: &[u8]) -> bool {
     assert!(check_witness(seller_acc));
     let self_addr = address();

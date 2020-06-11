@@ -19,14 +19,14 @@ const KEY_BALANCE: &[u8] = b"02";
 const TOTAL: U128 = 10000;
 
 #[derive(Encoder, Decoder, Clone)]
-struct AddrAmt {
+pub struct AddrAmt {
     to: Address,
     percent: U128,
     has_withdraw: bool,
 }
 
 #[derive(Encoder, Decoder)]
-struct RegisterParam {
+pub struct RegisterParam {
     addr_amt: Vec<AddrAmt>,
     token_type: TokenType,
     contract_addr: Option<Address>,
@@ -47,7 +47,10 @@ impl RegisterParam {
     }
 }
 
-fn register(key: &[u8], param_bytes: &[u8]) -> bool {
+/// register the dividend distribution strategy on the chain
+/// key is also called resource_id in the other contract, used to mark the uniqueness of dividend strategy
+/// param_bytes is the serialization result of RegisterParam
+pub fn register(key: &[u8], param_bytes: &[u8]) -> bool {
     let param = RegisterParam::from_bytes(param_bytes);
     let data = storage_read(key.as_ref()).map(|val: Vec<u8>| val);
     assert!(data.is_none());
@@ -75,12 +78,13 @@ fn register(key: &[u8], param_bytes: &[u8]) -> bool {
     true
 }
 
-fn get_register_param(key: &[u8]) -> RegisterParam {
+/// query RegisterParam by key
+pub fn get_register_param(key: &[u8]) -> RegisterParam {
     database::get::<_, RegisterParam>(generate_registry_param_key(key))
         .unwrap_or(RegisterParam::default())
 }
 
-fn transfer(from: &Address, key: &[u8], amt: U128) -> bool {
+pub fn transfer(from: &Address, key: &[u8], amt: U128) -> bool {
     let self_addr = address();
     let param = get_register_param(key);
     assert!(transfer_inner(
@@ -96,11 +100,14 @@ fn transfer(from: &Address, key: &[u8], amt: U128) -> bool {
     true
 }
 
-fn get_balance(key: &[u8]) -> U128 {
+pub fn get_balance(key: &[u8]) -> U128 {
     database::get::<_, U128>(generate_balance_key(key)).unwrap_or(0)
 }
 
-fn withdraw(key: &[u8], addr: &Address) -> bool {
+/// the data owner withdraw token from the contract
+/// key is also called resource_id in the other contract
+/// addr is the address who withdraw token, need the address signature
+pub fn withdraw(key: &[u8], addr: &Address) -> bool {
     assert!(check_witness(addr));
     let mut rp = get_register_param(key);
     let index = rp.addr_amt.iter().position(|addr_amt| &addr_amt.to == addr);
@@ -129,7 +136,7 @@ fn withdraw(key: &[u8], addr: &Address) -> bool {
 }
 
 //mp invoke
-fn transfer_withdraw(from: &Address, key: &[u8], amt: U128) -> bool {
+pub fn transfer_withdraw(from: &Address, key: &[u8], amt: U128) -> bool {
     let mut rp = get_register_param(key);
     for addr_amt in rp.addr_amt.iter_mut() {
         if !addr_amt.has_withdraw {
