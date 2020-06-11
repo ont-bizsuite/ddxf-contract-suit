@@ -68,7 +68,7 @@ fn transfer_amount(
         fee,
         n,
     };
-    database::put(utils::generate_balance_key(order_id_bytes), SettleInfo);
+    database::put(utils::generate_balance_key(order_id_bytes), info);
     true
 }
 
@@ -87,15 +87,17 @@ fn settle(seller_acc: &Address, order_id: &[u8]) -> bool {
     let fee_split = get_fee_split_model(seller_acc);
     let fee = info.fee;
     let total = info.n.checked_mul(fee.count as U128).unwrap();
-    let mp_fee = total.checked_mul(fee_split.percentage).unwrap();
+    let mp_fee = total.checked_mul(fee_split.percentage as U128).unwrap();
     let mp_amt = mp_fee.checked_div(MAX_PERCENTAGE).unwrap();
-    assert!(transfer(
-        &self_addr,
-        &mp,
-        mp_amt,
-        &balance.token_type,
-        balance.contract_address
-    ));
+    if mp_amt != 0 {
+        assert!(transfer(
+            &self_addr,
+            &mp,
+            mp_amt,
+            &fee.contract_type,
+            Some(fee.contract_addr)
+        ));
+    }
     //2.split
     let seller_amt = total.checked_sub(mp_amt).unwrap();
     let oi = OrderId::from_bytes(order_id);
@@ -111,37 +113,6 @@ fn settle(seller_acc: &Address, order_id: &[u8]) -> bool {
         panic!("call split contract failed")
     }
     database::delete(utils::generate_balance_key(order_id));
-    true
-}
-
-fn settle_inner(
-    seller_acc: &Address,
-    self_addr: &Address,
-    mp: &Address,
-    balance: TokenBalance,
-) -> bool {
-    let fee_split = get_fee_split_model(seller_acc);
-    let fee = balance
-        .balance
-        .checked_mul(fee_split.percentage as U128)
-        .unwrap();
-    let mp_amt = fee.checked_div(MAX_PERCENTAGE).unwrap();
-    assert!(transfer(
-        &self_addr,
-        &mp,
-        mp_amt,
-        &balance.token_type,
-        balance.contract_address
-    ));
-    let seller_amt = balance.balance.checked_sub(mp_amt).unwrap();
-
-    assert!(transfer(
-        &self_addr,
-        seller_acc,
-        seller_amt,
-        &balance.token_type,
-        balance.contract_address
-    ));
     true
 }
 

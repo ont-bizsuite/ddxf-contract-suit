@@ -3,6 +3,7 @@ use super::*;
 use ostd::contract::ong;
 use ostd::mock::build_runtime;
 const ONG_CONTRACT_ADDRESS: Address = ostd::macros::base58!("AFmseVrdL9f9oyCzZefL9tG6UbvhfRZMHJ");
+use common::OrderId;
 use ostd::mock::contract_mock::Command;
 use std::collections::btree_map::BTreeMap;
 
@@ -36,7 +37,7 @@ fn test() {
         if _addr == &ONG_CONTRACT_ADDRESS {
             mock_ong_contract(_data, &mut ong_balance_map)
         } else {
-            mock_ong_contract(_data, &mut ong_balance_map)
+            Some(vec![1u8])
         }
     };
     build.on_contract_call(call_contract);
@@ -45,21 +46,25 @@ fn test() {
 
     let self_addr = Address::repeat_byte(4);
     build.address(&self_addr);
-    oi = OrderId{
-        item_id:vec![0u8,1u8],
-        tx_hash:H256::new([0u8;32]),
-    }
+    let oi = OrderId {
+        item_id: vec![0u8, 1u8],
+        tx_hash: H256::new([0u8; 32]),
+    };
 
-    assert!(transfer_amount(&buyer, &seller, fee, 1));
+    assert!(transfer_amount(
+        oi.to_bytes().as_slice(),
+        &buyer,
+        &seller,
+        fee,
+        1
+    ));
 
-    let seller_balance = get_settle_info(&seller, &TokenType::ONG);
-    assert_eq!(seller_balance.balance, 1);
+    let seller_balance = get_settle_info(oi.to_bytes().as_slice());
 
     build.witness(&[seller.clone()]);
-    assert!(settle(&seller));
+    assert!(settle(&seller, oi.to_bytes().as_slice()));
 
-    let seller_balance = balance_of(&seller, &TokenType::ONG);
-    assert_eq!(seller_balance.balance, 0);
+    let seller_balance = get_settle_info(oi.to_bytes().as_slice());
 }
 
 fn mock_ong_contract(

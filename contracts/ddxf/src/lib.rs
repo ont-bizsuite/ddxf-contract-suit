@@ -26,7 +26,7 @@ const KEY_SELLER_ITEM_INFO: &[u8] = b"01";
 const KEY_SELLER_ITEM_SOLD: &[u8] = b"02";
 const KEY_DTOKEN_CONTRACT: &[u8] = b"03";
 const KEY_SPLIT_POLICY_CONTRACT: &[u8] = b"04";
-const KEY_ADMIN: &[u8] = b"04";
+const KEY_ADMIN: &[u8] = b"05";
 
 const ADMIN: Address = ostd::macros::base58!("AYnhakv7kC9R5ppw65JoE2rt6xDzCjCTvD");
 
@@ -143,7 +143,12 @@ fn buy_dtoken_from_reseller(
     let item_info =
         database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
             .unwrap();
+    let oi = OrderId {
+        item_id: resource_id.to_vec(),
+        tx_hash: current_txhash(),
+    };
     assert!(transfer_fee(
+        &oi,
         buyer_account,
         reseller_account,
         item_info.resource_ddo.mp_contract_address,
@@ -243,9 +248,9 @@ fn buy_dtoken(resource_id: &[u8], n: U128, buyer_account: &Address) -> bool {
         tx_hash: current_txhash(),
     };
     assert!(transfer_fee(
-        oi,
+        &oi,
         buyer_account,
-        &item_info.resource_ddo.managers,
+        &item_info.resource_ddo.manager,
         item_info.resource_ddo.mp_contract_address.clone(),
         item_info.resource_ddo.split_policy_contract_address,
         item_info.item.fee.clone(),
@@ -517,7 +522,7 @@ fn migrate(
 }
 
 fn transfer_fee(
-    oi: OrderId,
+    oi: &OrderId,
     buyer_account: &Address,
     seller_account: &Address,
     mp_contract_address: Option<Address>,
@@ -597,6 +602,15 @@ pub fn invoke() {
         b"getAdmin" => {
             sink.write(get_admin());
         }
+        b"init" => {
+            let (dtoken, split_policy) = source.read().unwrap();
+            sink.write(init(dtoken, split_policy));
+        }
+        b"setSplitPolicyContract" => {
+            let new_addr = source.read().unwrap();
+            sink.write(set_split_policy_contract(new_addr));
+        }
+        b"getSplitPolicyContract" => sink.write(get_split_policy_contract()),
         b"setDTokenContract" => {
             let new_addr = source.read().unwrap();
             sink.write(set_dtoken_contract(&new_addr));
@@ -609,8 +623,14 @@ pub fn invoke() {
             sink.write(migrate(code, vm_type, name, version, author, email, desc));
         }
         b"dtokenSellerPublish" => {
-            let (resource_id, resource_ddo, item) = source.read().unwrap();
-            sink.write(dtoken_seller_publish(resource_id, resource_ddo, item));
+            let (resource_id, resource_ddo, item, split_policy_param_bytes) =
+                source.read().unwrap();
+            sink.write(dtoken_seller_publish(
+                resource_id,
+                resource_ddo,
+                item,
+                split_policy_param_bytes,
+            ));
         }
         b"buyDtokenFromReseller" => {
             let (resource_id, n, buyer_account, reseller_account) = source.read().unwrap();

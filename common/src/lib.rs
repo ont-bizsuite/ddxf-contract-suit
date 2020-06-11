@@ -63,6 +63,16 @@ pub struct Fee {
     pub count: u64,
 }
 
+impl Fee {
+    pub fn default() -> Self {
+        Fee {
+            contract_addr: Address::new([0u8; 20]),
+            contract_type: TokenType::ONG,
+            count: 0,
+        }
+    }
+}
+
 #[derive(Clone)]
 pub enum TokenType {
     ONT,
