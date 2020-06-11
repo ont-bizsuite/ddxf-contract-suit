@@ -3,6 +3,9 @@ name = "split_policy"
 version = "0.1.0"
 authors = ["lucas7788 <sishsh@163.com>"]
 edition = "2018"
+homepage = "https://github.com/ont-bizsuite/ddxf-contract-suite"
+repository = "https://github.com/ont-bizsuite/ddxf-contract-suite"
+description = "split policy contract implement"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [lib]
