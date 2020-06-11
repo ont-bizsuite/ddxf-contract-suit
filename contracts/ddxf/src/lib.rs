@@ -6,7 +6,7 @@
 //!
 //! Buyer purchase and use process
 //!
-//! first of all, buyers should invoke [`buy_dtoken`](fn.buy_dtoken.html) method to buy the released products first
+//! first of all, buyers should invoke [`buy_dtoken`](fn.buy_dtoken.html) method to buy the released products
 //!
 //! Second, buyer invoke the [`use_token`](fn.use_token.html) method to consume token
 
