@@ -186,10 +186,12 @@ fn publish() {
 
     let handle = build_runtime();
     handle.witness(&[manager.clone(), ADMIN.clone()]);
+    let split_param = b"test";
     assert!(dtoken_seller_publish(
         resource_id,
         &ddo.to_bytes(),
-        &dtoken_item.to_bytes()
+        &dtoken_item.to_bytes(),
+        split_param
     ));
 
     assert!(set_dtoken_contract(&dtoken_contract_address));

@@ -1,7 +1,7 @@
 use super::ostd::abi::{Decoder, Encoder, Error, Sink, Source};
 use super::ostd::prelude::*;
 use super::ostd::types::{Address, H256};
-use common::{Fee, TokenTemplate};
+use common::{Fee, TokenTemplate, RT};
 
 #[derive(Clone, Encoder, Decoder)]
 pub struct TokenResourceTyEndpoint {
@@ -12,7 +12,7 @@ pub struct TokenResourceTyEndpoint {
 
 #[derive(Clone, Encoder, Decoder)]
 pub struct ResourceDDO {
-    pub manager: Address,                                          // data owner id
+    pub manager: Address,                                          // data owner
     pub token_resource_ty_endpoints: Vec<TokenResourceTyEndpoint>, // RT for tokens
     pub item_meta_hash: H256,
     pub dtoken_contract_address: Option<Address>, // can not be empty
@@ -30,36 +30,6 @@ impl ResourceDDO {
         let mut sink = Sink::new(16);
         sink.write(self);
         sink.bytes().to_vec()
-    }
-}
-
-#[derive(Clone)]
-pub enum RT {
-    Other,
-    RTStaticFile,
-}
-
-impl Encoder for RT {
-    fn encode(&self, sink: &mut Sink) {
-        match self {
-            RT::Other => {
-                sink.write(0u8);
-            }
-            RT::RTStaticFile => {
-                sink.write(1u8);
-            }
-        }
-    }
-}
-
-impl<'a> Decoder<'a> for RT {
-    fn decode(source: &mut Source<'a>) -> Result<Self, Error> {
-        let u = source.read_byte()?;
-        match u {
-            0 => Ok(RT::Other),
-            1 => Ok(RT::RTStaticFile),
-            _ => panic!("not support rt:{}", u),
-        }
     }
 }
 

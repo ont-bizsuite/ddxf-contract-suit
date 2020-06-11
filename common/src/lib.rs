@@ -110,6 +110,36 @@ impl<'a> Decoder<'a> for TokenType {
     }
 }
 
+#[derive(Clone)]
+pub enum RT {
+    Other,
+    RTStaticFile,
+}
+
+impl Encoder for RT {
+    fn encode(&self, sink: &mut Sink) {
+        match self {
+            RT::Other => {
+                sink.write(0u8);
+            }
+            RT::RTStaticFile => {
+                sink.write(1u8);
+            }
+        }
+    }
+}
+
+impl<'a> Decoder<'a> for RT {
+    fn decode(source: &mut Source<'a>) -> Result<Self, Error> {
+        let u = source.read_byte()?;
+        match u {
+            0 => Ok(RT::Other),
+            1 => Ok(RT::RTStaticFile),
+            _ => panic!("not support rt:{}", u),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
