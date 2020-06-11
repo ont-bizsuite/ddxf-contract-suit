@@ -13,7 +13,7 @@ use basic::*;
 mod dtoken;
 use common::*;
 use dtoken::*;
-use ostd::contract::{ong, ont, wasm};
+use ostd::contract::wasm;
 use ostd::runtime::{check_witness, contract_migrate, current_txhash};
 
 #[cfg(test)]
@@ -156,7 +156,6 @@ fn buy_dtoken_from_reseller(
     assert!(transfer_fee(
         &oi,
         buyer_account,
-        reseller_account,
         item_info.resource_ddo.mp_contract_address,
         &item_info
             .resource_ddo
@@ -256,17 +255,14 @@ fn buy_dtoken(resource_id: &[u8], n: U128, buyer_account: &Address) -> bool {
         item_id: resource_id.to_vec(),
         tx_hash: current_txhash(),
     };
-
-    let split_contract = get_split_policy_contract();
     assert!(transfer_fee(
         &oi,
         buyer_account,
-        &item_info.resource_ddo.manager,
         item_info.resource_ddo.mp_contract_address.clone(),
         &item_info
             .resource_ddo
             .split_policy_contract_address
-            .unwrap_or(split_contract),
+            .unwrap_or(get_split_policy_contract()),
         item_info.item.fee.clone(),
         n
     ));
@@ -538,58 +534,38 @@ fn migrate(
 fn transfer_fee(
     oi: &OrderId,
     buyer_account: &Address,
-    seller_account: &Address,
     mp_contract_address: Option<Address>,
     split_contract_address: &Address,
     fee: Fee,
     n: U128,
 ) -> bool {
-    if let Some(mp_addr) = mp_contract_address {
-        wasm::call_contract(
+    let res = match mp_contract_address {
+        Some(mp_addr) => wasm::call_contract(
             &mp_addr,
             (
                 "transferAmount",
-                (oi.to_bytes(), buyer_account, seller_account, fee, n),
+                (oi.to_bytes(), buyer_account, split_contract_address, fee, n),
             ),
-        );
+        ),
+        _ => {
+            let amt = n.checked_mul(fee.count as U128).unwrap();
+            wasm::call_contract(
+                split_contract_address,
+                (
+                    "transferWithdraw",
+                    (oi.item_id.as_slice(), buyer_account, amt),
+                ),
+            )
+        }
+    };
+    if let Some(rr) = res {
+        let mut source = Source::new(&rr);
+        let r: bool = source.read().unwrap();
+        assert!(r);
+        true
     } else {
-        let amt = n.checked_mul(fee.count as U128).unwrap();
-        assert!(transfer_inner(
-            buyer_account,
-            &split_contract_address,
-            amt,
-            &fee.contract_type,
-            Some(fee.contract_addr)
-        ));
+        panic!("call contract failed")
     }
-    true
-}
-
-fn transfer_inner(
-    from: &Address,
-    to: &Address,
-    amt: U128,
-    contract_type: &TokenType,
-    contract_addr: Option<Address>,
-) -> bool {
-    match contract_type {
-        TokenType::ONG => {
-            assert!(ong::transfer(from, to, amt));
-        }
-        TokenType::ONT => {
-            assert!(ont::transfer(from, to, amt));
-        }
-        TokenType::OEP4 => {
-            //TODO
-            let contract_address = contract_addr.unwrap();
-            let res =
-                wasm::call_contract(&contract_address, ("transfer", (from, to, amt))).unwrap();
-            let mut source = Source::new(&res);
-            let r: bool = source.read().unwrap();
-            assert!(r);
-        }
-    }
-    true
 }
 
 #[no_mangle]
