@@ -1,14 +1,14 @@
 //! ddxf contract
 //!
-//! User publishing process
+//! Seller publishing process
 //!
-//! user only need invoke `dtoken_seller_publish` method to publish products
+//! seller only need invoke [`dtoken_seller_publish`](fn.dtoken_seller_publish.html) method to publish products
 //!
-//! User purchase and use process
+//! Buyer purchase and use process
 //!
-//! first of all, users should invoke `buyDtoken` method to buy the released products first
+//! first of all, buyers should invoke [`buy_dtoken`](fn.buy_dtoken.html) method to buy the released products first
 //!
-//! Second user invoke the `useToken` method to consume token
+//! Second, buyer invoke the [`use_token`](fn.use_token.html) method to consume token
 
 #![cfg_attr(not(feature = "mock"), no_std)]
 #![feature(proc_macro_hygiene)]
