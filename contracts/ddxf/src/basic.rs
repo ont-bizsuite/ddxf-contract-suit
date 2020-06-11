@@ -1,4 +1,4 @@
-use super::ostd::abi::{Decoder, Encoder, Error, Sink, Source};
+use super::ostd::abi::{Decoder, Encoder, Sink, Source};
 use super::ostd::prelude::*;
 use super::ostd::types::{Address, H256};
 use common::{Fee, TokenTemplate, RT};
