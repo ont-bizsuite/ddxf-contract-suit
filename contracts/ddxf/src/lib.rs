@@ -116,7 +116,9 @@ fn dtoken_seller_publish(
     //invoke split_policy contract
     let split_addr = get_split_policy_contract();
     let res = wasm::call_contract(
-        &split_addr,
+        &resource_ddo
+            .split_policy_contract_address
+            .unwrap_or(split_addr),
         ("register", (resource_id, split_policy_param_bytes)),
     );
     if let Some(r) = res {
@@ -156,7 +158,7 @@ fn buy_dtoken_from_reseller(
         buyer_account,
         reseller_account,
         item_info.resource_ddo.mp_contract_address,
-        item_info
+        &item_info
             .resource_ddo
             .split_policy_contract_address
             .unwrap_or(split_contract),
@@ -261,7 +263,7 @@ fn buy_dtoken(resource_id: &[u8], n: U128, buyer_account: &Address) -> bool {
         buyer_account,
         &item_info.resource_ddo.manager,
         item_info.resource_ddo.mp_contract_address.clone(),
-        item_info
+        &item_info
             .resource_ddo
             .split_policy_contract_address
             .unwrap_or(split_contract),
@@ -538,7 +540,7 @@ fn transfer_fee(
     buyer_account: &Address,
     seller_account: &Address,
     mp_contract_address: Option<Address>,
-    split_contract_address: Address,
+    split_contract_address: &Address,
     fee: Fee,
     n: U128,
 ) -> bool {
