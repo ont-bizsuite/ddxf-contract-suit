@@ -1,4 +1,4 @@
-# ddxf contract suit
+# ddxf contract suite
 
 ddxf is a decentralized data exchange framework, aimed to solve the data self sovereign problem.
 
