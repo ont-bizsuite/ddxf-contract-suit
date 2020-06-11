@@ -30,6 +30,8 @@ const KEY_ADMIN: &[u8] = b"05";
 
 const ADMIN: Address = ostd::macros::base58!("AYnhakv7kC9R5ppw65JoE2rt6xDzCjCTvD");
 const DEFAULT_SPLIT_CONTRACT: Address = ostd::macros::base58!("AYnhakv7kC9R5ppw65JoE2rt6xDzCjCTvD");
+const DEFAULT_DTOKEN_CONTRACT: Address =
+    ostd::macros::base58!("AYnhakv7kC9R5ppw65JoE2rt6xDzCjCTvD");
 
 // need admin signature
 fn set_dtoken_contract(new_addr: &Address) -> bool {
@@ -46,7 +48,7 @@ fn init(dtoken: Address, split_policy: Address) -> bool {
 }
 
 fn get_dtoken_contract() -> Address {
-    database::get::<_, Address>(KEY_DTOKEN_CONTRACT).unwrap()
+    database::get::<_, Address>(KEY_DTOKEN_CONTRACT).unwrap_or(DEFAULT_DTOKEN_CONTRACT)
 }
 
 // need admin signature
@@ -148,12 +150,16 @@ fn buy_dtoken_from_reseller(
         item_id: resource_id.to_vec(),
         tx_hash: current_txhash(),
     };
+    let split_contract = get_split_policy_contract();
     assert!(transfer_fee(
         &oi,
         buyer_account,
         reseller_account,
         item_info.resource_ddo.mp_contract_address,
-        item_info.resource_ddo.split_policy_contract_address,
+        item_info
+            .resource_ddo
+            .split_policy_contract_address
+            .unwrap_or(split_contract),
         item_info.item.fee.clone(),
         n
     ));
@@ -248,12 +254,17 @@ fn buy_dtoken(resource_id: &[u8], n: U128, buyer_account: &Address) -> bool {
         item_id: resource_id.to_vec(),
         tx_hash: current_txhash(),
     };
+
+    let split_contract = get_split_policy_contract();
     assert!(transfer_fee(
         &oi,
         buyer_account,
         &item_info.resource_ddo.manager,
         item_info.resource_ddo.mp_contract_address.clone(),
-        item_info.resource_ddo.split_policy_contract_address,
+        item_info
+            .resource_ddo
+            .split_policy_contract_address
+            .unwrap_or(split_contract),
         item_info.item.fee.clone(),
         n
     ));
@@ -527,7 +538,7 @@ fn transfer_fee(
     buyer_account: &Address,
     seller_account: &Address,
     mp_contract_address: Option<Address>,
-    split_contract_address: Option<Address>,
+    split_contract_address: Address,
     fee: Fee,
     n: U128,
 ) -> bool {
@@ -541,23 +552,13 @@ fn transfer_fee(
         );
     } else {
         let amt = n.checked_mul(fee.count as U128).unwrap();
-        if let Some(split_contract_addr) = split_contract_address {
-            assert!(transfer_inner(
-                buyer_account,
-                &split_contract_addr,
-                amt,
-                &fee.contract_type,
-                Some(fee.contract_addr)
-            ));
-        } else {
-            assert!(transfer_inner(
-                buyer_account,
-                seller_account,
-                amt,
-                &fee.contract_type,
-                Some(fee.contract_addr)
-            ));
-        }
+        assert!(transfer_inner(
+            buyer_account,
+            &split_contract_address,
+            amt,
+            &fee.contract_type,
+            Some(fee.contract_addr)
+        ));
     }
     true
 }
