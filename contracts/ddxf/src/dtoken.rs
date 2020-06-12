@@ -1,5 +1,5 @@
 use super::ostd::contract::wasm;
-use super::{Address, Vec, U128};
+use super::{verify_result, Address, Vec, U128};
 
 pub fn remove_agents_dtoken(
     contract_address: &Address,
@@ -8,13 +8,13 @@ pub fn remove_agents_dtoken(
     agents: Vec<&Address>,
     templates_bytes: &[u8],
 ) -> bool {
-    wasm::call_contract(
+    verify_result(wasm::call_contract(
         contract_address,
         (
             "removeAgents",
             (account, resource_id, agents, templates_bytes),
         ),
-    );
+    ));
     true
 }
 
@@ -25,13 +25,13 @@ pub fn remove_token_agents_dtoken(
     template_bytes: &[u8],
     agents: Vec<&Address>,
 ) -> bool {
-    wasm::call_contract(
+    verify_result(wasm::call_contract(
         contract_address,
         (
             "removeAgents",
             (account, resource_id, agents, template_bytes),
         ),
-    );
+    ));
     true
 }
 
@@ -43,13 +43,13 @@ pub fn set_agents_dtoken(
     n: U128,
     token_templates_bytes: &[u8],
 ) -> bool {
-    wasm::call_contract(
+    verify_result(wasm::call_contract(
         contract_address,
         (
             "setAgents",
             (account, resource_id, agents, n, token_templates_bytes),
         ),
-    );
+    ));
     true
 }
 
@@ -61,13 +61,13 @@ pub fn set_token_agents_dtoken(
     agents: &[Address],
     n: U128,
 ) -> bool {
-    wasm::call_contract(
+    verify_result(wasm::call_contract(
         contract_address,
         (
             "setTokenAgents",
             (account, resource_id, token_template_bytes, agents, n),
         ),
-    );
+    ));
     true
 }
 
@@ -78,10 +78,10 @@ pub fn use_token_dtoken(
     token_template_bytes: &[u8],
     n: U128,
 ) -> bool {
-    wasm::call_contract(
+    verify_result(wasm::call_contract(
         contract_address,
         ("useToken", (account, resource_id, token_template_bytes, n)),
-    );
+    ));
     true
 }
 
@@ -93,13 +93,13 @@ pub fn add_token_agents_dtoken(
     agents: Vec<&Address>,
     n: U128,
 ) -> bool {
-    wasm::call_contract(
+    verify_result(wasm::call_contract(
         contract_address,
         (
             "addTokenAgents",
             (account, resource_id, token_template_bytes, agents, n),
         ),
-    );
+    ));
     true
 }
 pub fn add_agents_dtoken(
@@ -110,13 +110,13 @@ pub fn add_agents_dtoken(
     n: U128,
     token_templates_bytes: &[u8],
 ) -> bool {
-    wasm::call_contract(
+    verify_result(wasm::call_contract(
         contract_address,
         (
             "addAgents",
             (account, resource_id, agents, n, token_templates_bytes),
         ),
-    );
+    ));
     true
 }
 
@@ -128,13 +128,13 @@ pub fn use_token_by_agent_dtoken(
     token_template_bytes: &[u8],
     n: U128,
 ) -> bool {
-    wasm::call_contract(
+    verify_result(wasm::call_contract(
         contract_address,
         (
             "useTokenByAgent",
             (account, agent, resource_id, token_template_bytes, n),
         ),
-    );
+    ));
     true
 }
 
@@ -146,13 +146,13 @@ pub fn transfer_dtoken(
     templates_bytes: &[u8],
     n: U128,
 ) -> bool {
-    wasm::call_contract(
+    verify_result(wasm::call_contract(
         contract_address,
         (
             "transferDToken",
             (from_account, to_account, resource_id, templates_bytes, n),
         ),
-    );
+    ));
     true
 }
 
@@ -163,9 +163,9 @@ pub fn generate_dtoken(
     templates_bytes: &[u8],
     n: U128,
 ) -> bool {
-    wasm::call_contract(
+    verify_result(wasm::call_contract(
         contract_address,
         ("generateDToken", (account, resource_id, templates_bytes, n)),
-    );
+    ));
     true
 }

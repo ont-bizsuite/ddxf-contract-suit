@@ -21,7 +21,7 @@ const TOTAL: U128 = 10000;
 #[derive(Encoder, Decoder, Clone)]
 pub struct AddrAmt {
     to: Address,
-    percent: U128,
+    percent: u32,
     has_withdraw: bool,
 }
 
@@ -65,7 +65,7 @@ pub fn register(key: &[u8], param_bytes: &[u8]) -> bool {
     let mut total: U128 = 0;
     let mut valid = false;
     for aa in param.addr_amt.iter() {
-        total += aa.percent;
+        total += aa.percent as U128;
         if !valid {
             valid = check_witness(&aa.to);
         }

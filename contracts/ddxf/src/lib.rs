@@ -208,6 +208,16 @@ pub fn dtoken_seller_publish(
     true
 }
 
+pub fn get_seller_item_info(resource_id: &[u8]) -> Vec<u8> {
+    let r = runtime::storage_read(utils::generate_seller_item_info_key(resource_id).as_slice())
+        .map(|val: Vec<u8>| val);
+    if let Some(rr) = r {
+        rr
+    } else {
+        vec![]
+    }
+}
+
 /// buy dtoken from reseller
 ///
 /// The seller can sell what he bought before he used it
@@ -705,6 +715,7 @@ fn migrate(
     true
 }
 
+// inner method
 fn transfer_fee(
     oi: &OrderId,
     buyer_account: &Address,
@@ -732,11 +743,15 @@ fn transfer_fee(
             )
         }
     };
-    if let Some(rr) = res {
-        let mut source = Source::new(&rr);
+    verify_result(res);
+    true
+}
+
+fn verify_result(res: Option<Vec<u8>>) {
+    if let Some(r) = res {
+        let mut source = Source::new(r.as_slice());
         let r: bool = source.read().unwrap();
         assert!(r);
-        true
     } else {
         panic!("call contract failed")
     }
@@ -785,6 +800,10 @@ pub fn invoke() {
                 item,
                 split_policy_param_bytes,
             ));
+        }
+        b"getSellerItemInfo" => {
+            let resource_id = source.read().unwrap();
+            sink.write(get_seller_item_info(resource_id))
         }
         b"buyDtokenFromReseller" => {
             let (resource_id, n, buyer_account, reseller_account) = source.read().unwrap();
