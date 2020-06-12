@@ -2,7 +2,7 @@
 
 ddxf是一个通用的去中心化数据交易框架，解决的痛点是数据自治。
 
-[这里](https://ont-bizsuite.github.io/ddxf-contract-suite/doc/ddxf/)是ddxf合约的开发文档。
+[这里](https://ont-bizsuite.github.io/ddxf-contract-suite/ddxf/)是ddxf合约的开发文档。
 
 该框架中有以下角色：卖家、MP、买家、Registry、Browser。
 
