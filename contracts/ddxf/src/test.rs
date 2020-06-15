@@ -48,7 +48,7 @@ fn dtoken_test() {
             count: 1000000,
         },
         expired_date: 10000,
-        stocks: 1000,
+        sold: 1000,
         templates: vec![TokenTemplate::new(None, vec![vec![1u8; 32]])],
     };
 
@@ -57,7 +57,7 @@ fn dtoken_test() {
 
     let mut source = Source::new(sink.bytes());
     let item2: DTokenItem = source.read().unwrap();
-    assert_eq!(item.stocks, item2.stocks);
+    assert_eq!(item.sold, item2.sold);
 }
 
 #[test]
@@ -180,7 +180,7 @@ fn publish() {
     let dtoken_item = DTokenItem {
         fee,
         expired_date: 1,
-        stocks: 1,
+        sold: 1,
         templates,
     };
 
