@@ -15,7 +15,7 @@ const KEY_DATA_ID: &[u8] = b"01";
 #[derive(Encoder, Decoder)]
 pub struct OntIdIndex {
     ont_id: Vec<u8>,
-    index: U128,
+    index: u16,
 }
 
 #[derive(Encoder, Decoder)]
@@ -51,7 +51,7 @@ pub fn register_data_id(info_bytes: &[u8]) -> bool {
         if valid {
             break;
         }
-        valid = ontid::verify_signature(owner.ont_id.as_slice(), owner.index);
+        valid = ontid::verify_signature(owner.ont_id.as_slice(), owner.index as U128);
     }
     assert!(valid);
     database::put(
@@ -79,7 +79,7 @@ pub fn check_owner(data_id: Vec<u8>) -> bool {
         if valid {
             break;
         }
-        valid = ontid::verify_signature(owner.ont_id.as_slice(), owner.index);
+        valid = ontid::verify_signature(owner.ont_id.as_slice(), owner.index as U128);
     }
     assert!(valid);
     return true;
@@ -96,11 +96,11 @@ pub fn invoke() {
             let data_id_bytes: &[u8] = source.read().unwrap();
             sink.write(register_data_id(data_id_bytes));
         }
-        b"get_data_id_info" => {
+        b"getDataIdInfo" => {
             let data_id: Vec<u8> = source.read().unwrap();
             sink.write(get_data_id_info(data_id));
         }
-        b"check_owner" => {
+        b"checkOwner" => {
             let data_id = source.read().unwrap();
             sink.write(check_owner(data_id));
         }

@@ -18,6 +18,7 @@ pub struct ResourceDDO {
     pub dtoken_contract_address: Option<Address>, // can not be empty
     pub mp_contract_address: Option<Address>,     // can be empty
     pub split_policy_contract_address: Option<Address>, //can be empty
+    pub is_freeze: bool,
 }
 
 impl ResourceDDO {
@@ -49,6 +50,7 @@ impl SellerItemInfo {
 pub struct DTokenItem {
     pub fee: Fee,
     pub expired_date: u64,
+    pub raw_stocks:u32,
     pub stocks: u32,
     pub templates: Vec<TokenTemplate>,
 }
