@@ -35,7 +35,6 @@ const SHA256_SIZE: u32 = 32;
 const CRC32_SIZE: u32 = 4;
 
 const KEY_SELLER_ITEM_INFO: &[u8] = b"01";
-const KEY_SELLER_ITEM_SOLD: &[u8] = b"02";
 const KEY_DTOKEN_CONTRACT: &[u8] = b"03";
 const KEY_SPLIT_POLICY_CONTRACT: &[u8] = b"04";
 const KEY_ADMIN: &[u8] = b"05";
@@ -152,7 +151,6 @@ pub fn dtoken_seller_publish(
 ) -> bool {
     let resource_ddo = ResourceDDO::from_bytes(resource_ddo_bytes);
     let item = DTokenItem::from_bytes(item_bytes);
-    assert_eq!(item.stocks, item.raw_stocks);
     assert!(runtime::check_witness(&resource_ddo.manager));
     let resource =
         database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id));
@@ -215,7 +213,7 @@ fn freeze(resource_id: &[u8]) -> bool {
             .unwrap();
     assert!(check_witness(&item_info.resource_ddo.manager));
     item_info.resource_ddo.is_freeze = true;
-    if item_info.item.raw_stocks == item_info.item.stocks {
+    if item_info.item.sold == 0 {
         database::delete(utils::generate_seller_item_info_key(resource_id));
     } else {
         database::put(utils::generate_seller_item_info_key(resource_id), item_info);
@@ -364,17 +362,16 @@ fn get_token_templates_endpoint(resource_id: &[u8]) -> Vec<u8> {
 /// `buyer_account` is buyer address, need this address signature
 pub fn buy_dtoken(resource_id: &[u8], n: U128, buyer_account: &Address) -> bool {
     assert!(runtime::check_witness(buyer_account));
-    let item_info =
+    let mut item_info =
         database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
             .unwrap();
     assert!(item_info.resource_ddo.is_freeze == false);
     let now = runtime::timestamp();
     assert!(now < item_info.item.expired_date);
-    let sold =
-        database::get::<_, U128>(utils::generate_seller_item_sold_key(resource_id)).unwrap_or(0);
-    assert!(sold < item_info.item.stocks as U128);
-    let sum = sold.checked_add(n).unwrap();
-    assert!(sum <= item_info.item.stocks as U128);
+
+    assert!(item_info.item.sold < item_info.item.stocks);
+    item_info.item.sold = n.checked_add(item_info.item.sold as U128).unwrap() as u32;
+    assert!(item_info.item.sold <= item_info.item.stocks);
     let oi = OrderId {
         item_id: resource_id.to_vec(),
         tx_hash: current_txhash(),
@@ -390,8 +387,10 @@ pub fn buy_dtoken(resource_id: &[u8], n: U128, buyer_account: &Address) -> bool 
         item_info.item.fee.clone(),
         n
     ));
-    database::put(utils::generate_seller_item_sold_key(resource_id), sum);
-
+    database::put(
+        utils::generate_seller_item_info_key(resource_id),
+        &item_info,
+    );
     let dtoken = get_dtoken_contract();
     assert!(generate_dtoken(
         &item_info
@@ -970,9 +969,6 @@ mod utils {
     use alloc::vec::Vec;
     pub fn generate_seller_item_info_key(resource_id: &[u8]) -> Vec<u8> {
         [KEY_SELLER_ITEM_INFO, resource_id].concat()
-    }
-    pub fn generate_seller_item_sold_key(resource_id: &[u8]) -> Vec<u8> {
-        [KEY_SELLER_ITEM_SOLD, resource_id].concat()
     }
 }
 
