@@ -378,6 +378,13 @@ pub fn buy_use_token(
             n
         ));
     }
+    EventBuilder::new()
+        .string("buyAndUseToken")
+        .bytearray(resource_id)
+        .number(n)
+        .address(buyer_account)
+        .address(payer)
+        .notify();
     true
 }
 
@@ -435,6 +442,7 @@ pub fn buy_dtoken(resource_id: &[u8], n: U128, buyer_account: &Address, payer: &
         .bytearray(resource_id)
         .number(n)
         .address(buyer_account)
+        .address(payer)
         .notify();
     true
 }
@@ -896,6 +904,10 @@ pub fn invoke() {
         b"buyDtoken" => {
             let (resource_id, n, buyer_account, payer) = source.read().unwrap();
             sink.write(buy_dtoken(resource_id, n, buyer_account, payer));
+        }
+        b"buyAndUseToken" => {
+            let (resource_id, n, buyer_account, payer) = source.read().unwrap();
+            sink.write(buy_use_token(resource_id, n, buyer_account, payer));
         }
         b"getTokenTemplates" => {
             let resource_id = source.read().unwrap();
