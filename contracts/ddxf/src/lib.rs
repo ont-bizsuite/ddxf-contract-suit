@@ -152,6 +152,7 @@ pub fn dtoken_seller_publish(
 ) -> bool {
     let resource_ddo = ResourceDDO::from_bytes(resource_ddo_bytes);
     let item = DTokenItem::from_bytes(item_bytes);
+    assert_eq!(item.stocks, item.raw_stocks);
     assert!(runtime::check_witness(&resource_ddo.manager));
     let resource =
         database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id));
@@ -206,6 +207,34 @@ pub fn dtoken_seller_publish(
     sink2.write(item);
     events::dtoken_seller_publish_event(resource_id, sink.bytes(), sink2.bytes());
     true
+}
+
+fn freeze(resource_id: &[u8]) -> bool {
+    let mut item_info =
+        database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
+            .unwrap();
+    assert!(check_witness(&item_info.resource_ddo.manager));
+    item_info.resource_ddo.is_freeze = true;
+    if item_info.item.raw_stocks == item_info.item.stocks {
+        database::delete(utils::generate_seller_item_info_key(resource_id));
+    } else {
+        database::put(utils::generate_seller_item_info_key(resource_id), item_info);
+    }
+    EventBuilder::new()
+        .string("freeze")
+        .bytearray(resource_id)
+        .notify();
+    true
+}
+
+pub fn get_seller_item_info(resource_id: &[u8]) -> Vec<u8> {
+    let r = runtime::storage_read(utils::generate_seller_item_info_key(resource_id).as_slice())
+        .map(|val: Vec<u8>| val);
+    if let Some(rr) = r {
+        rr
+    } else {
+        vec![]
+    }
 }
 
 /// buy dtoken from reseller
@@ -338,6 +367,7 @@ pub fn buy_dtoken(resource_id: &[u8], n: U128, buyer_account: &Address) -> bool 
     let item_info =
         database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
             .unwrap();
+    assert!(item_info.resource_ddo.is_freeze == false);
     let now = runtime::timestamp();
     assert!(now < item_info.item.expired_date);
     let sold =
@@ -705,6 +735,7 @@ fn migrate(
     true
 }
 
+// inner method
 fn transfer_fee(
     oi: &OrderId,
     buyer_account: &Address,
@@ -727,16 +758,20 @@ fn transfer_fee(
                 split_contract_address,
                 (
                     "transferWithdraw",
-                    (oi.item_id.as_slice(), buyer_account, amt),
+                    (buyer_account, oi.item_id.as_slice(), amt),
                 ),
             )
         }
     };
-    if let Some(rr) = res {
-        let mut source = Source::new(&rr);
+    verify_result(res);
+    true
+}
+
+fn verify_result(res: Option<Vec<u8>>) {
+    if let Some(r) = res {
+        let mut source = Source::new(r.as_slice());
         let r: bool = source.read().unwrap();
         assert!(r);
-        true
     } else {
         panic!("call contract failed")
     }
@@ -785,6 +820,14 @@ pub fn invoke() {
                 item,
                 split_policy_param_bytes,
             ));
+        }
+        b"getSellerItemInfo" => {
+            let resource_id = source.read().unwrap();
+            sink.write(get_seller_item_info(resource_id))
+        }
+        b"freeze" => {
+            let resource_id = source.read().unwrap();
+            sink.write(freeze(resource_id));
         }
         b"buyDtokenFromReseller" => {
             let (resource_id, n, buyer_account, reseller_account) = source.read().unwrap();

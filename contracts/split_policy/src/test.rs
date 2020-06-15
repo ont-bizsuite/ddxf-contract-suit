@@ -3,8 +3,16 @@ use super::{
     get_balance, get_register_param, register, transfer, withdraw, AddrAmt, RegisterParam,
 };
 use common::TokenType;
+use hexutil::read_hex;
 use ontio_std::abi::{Sink, Source};
 use ontio_std::types::Address;
+
+#[test]
+fn test_registry3() {
+    let data =
+        read_hex("01fbe02b027e61a6d7602f26cfa9487fa58ef9ee7288130000000100").unwrap_or_default();
+    let rp = RegisterParam::from_bytes(data.as_slice());
+}
 
 #[test]
 fn test_registry() {

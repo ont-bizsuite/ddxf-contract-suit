@@ -2,9 +2,10 @@
 #![feature(proc_macro_hygiene)]
 extern crate ontio_std as ostd;
 use ostd::abi::{Decoder, Encoder, EventBuilder, Sink, Source};
+use ostd::contract::ontid;
 use ostd::database;
 use ostd::prelude::*;
-use ostd::runtime::{check_witness, input, ret};
+use ostd::runtime::{input, ret};
 use ostd::types::H256;
 extern crate common;
 use common::RT;
@@ -12,12 +13,18 @@ use common::RT;
 const KEY_DATA_ID: &[u8] = b"01";
 
 #[derive(Encoder, Decoder)]
+pub struct OntIdIndex {
+    ont_id: Vec<u8>,
+    index: u16,
+}
+
+#[derive(Encoder, Decoder)]
 pub struct DataIdInfo {
-    data_id: Vec<u8>,     //used to uniquely mark a piece of data
-    data_type: RT,        // data type, contains static data type and other type.
+    data_id: Vec<u8>,        //used to uniquely mark a piece of data
+    data_type: RT,           // data type, contains static data type and other type.
     data_meta_hash: H256, //data meta is meta information of data, data meta hash is the sha256 of data meta
     data_hash: H256,      //data hash is sha256 of data
-    owners: Vec<Address>, // data owner
+    owners: Vec<OntIdIndex>, // data owner
 }
 
 impl DataIdInfo {
@@ -44,7 +51,7 @@ pub fn register_data_id(info_bytes: &[u8]) -> bool {
         if valid {
             break;
         }
-        valid = check_witness(owner);
+        valid = ontid::verify_signature(owner.ont_id.as_slice(), owner.index as U128);
     }
     assert!(valid);
     database::put(
@@ -53,7 +60,6 @@ pub fn register_data_id(info_bytes: &[u8]) -> bool {
     );
     EventBuilder::new()
         .string("registerDataId")
-        .address(&data_id_info.owners[0])
         .bytearray(data_id_info.data_id.as_slice())
         .notify();
     true
@@ -73,7 +79,7 @@ pub fn check_owner(data_id: Vec<u8>) -> bool {
         if valid {
             break;
         }
-        valid = check_witness(owner);
+        valid = ontid::verify_signature(owner.ont_id.as_slice(), owner.index as U128);
     }
     assert!(valid);
     return true;
@@ -90,11 +96,11 @@ pub fn invoke() {
             let data_id_bytes: &[u8] = source.read().unwrap();
             sink.write(register_data_id(data_id_bytes));
         }
-        b"get_data_id_info" => {
+        b"getDataIdInfo" => {
             let data_id: Vec<u8> = source.read().unwrap();
             sink.write(get_data_id_info(data_id));
         }
-        b"check_owner" => {
+        b"checkOwner" => {
             let data_id = source.read().unwrap();
             sink.write(check_owner(data_id));
         }

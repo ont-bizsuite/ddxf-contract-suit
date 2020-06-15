@@ -17,5 +17,8 @@ crate-type = ["cdylib"] #Compile as a dynamic link library
 common = {path="../../common"}
 ontio-std = {git = "https://github.com/ontio/ontology-wasm-cdt-rust.git"}
 
+[dev-dependencies]
+etcommon-hexutil = { version = "0.2.4", default-features = false }
+
 [features]
 mock = ["ontio-std/mock"]

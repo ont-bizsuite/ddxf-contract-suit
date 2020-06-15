@@ -21,7 +21,7 @@ const TOTAL: U128 = 10000;
 #[derive(Encoder, Decoder, Clone)]
 pub struct AddrAmt {
     to: Address,
-    percent: U128,
+    percent: u32,
     has_withdraw: bool,
 }
 
@@ -65,7 +65,7 @@ pub fn register(key: &[u8], param_bytes: &[u8]) -> bool {
     let mut total: U128 = 0;
     let mut valid = false;
     for aa in param.addr_amt.iter() {
-        total += aa.percent;
+        total += aa.percent as U128;
         if !valid {
             valid = check_witness(&aa.to);
         }
@@ -120,7 +120,7 @@ pub fn withdraw(key: &[u8], addr: &Address) -> bool {
         if addr_amt.has_withdraw == false {
             let self_addr = address();
             let balance = get_balance(key);
-            let temp = balance.checked_mul(addr_amt.percent).unwrap();
+            let temp = balance.checked_mul(addr_amt.percent as U128).unwrap();
             let amt = temp.checked_div(TOTAL).unwrap();
             assert!(transfer_inner(
                 &self_addr,
@@ -144,7 +144,7 @@ pub fn transfer_withdraw(from: &Address, key: &[u8], amt: U128) -> bool {
     let mut rp = get_register_param(key);
     for addr_amt in rp.addr_amt.iter_mut() {
         if !addr_amt.has_withdraw {
-            let temp = amt.checked_mul(addr_amt.percent).unwrap();
+            let temp = amt.checked_mul(addr_amt.percent as U128).unwrap();
             let temp = temp.checked_div(TOTAL).unwrap();
             assert!(transfer_inner(
                 from,
@@ -209,7 +209,7 @@ pub fn invoke() {
             let (key, param_bytes) = source.read().unwrap();
             sink.write(register(key, param_bytes));
         }
-        b"get_register_param" => {
+        b"getRegisterParam" => {
             let key = source.read().unwrap();
             sink.write(get_register_param(key));
         }
@@ -217,7 +217,7 @@ pub fn invoke() {
             let (from, key, amt): (Address, &[u8], U128) = source.read().unwrap();
             sink.write(transfer(&from, key, amt));
         }
-        b"get_balance" => {
+        b"getBalance" => {
             let key = source.read().unwrap();
             sink.write(get_balance(key));
         }
