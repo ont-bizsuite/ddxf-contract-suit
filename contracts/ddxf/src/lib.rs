@@ -301,11 +301,16 @@ pub fn buy_dtoken_from_reseller(
 /// `ns` is array of n which is the number of purchases. the length of resource_ids must be the same with the length of ns.
 ///
 /// `buyer_account` is buyer address, need this address signature
-pub fn buy_dtokens(resource_ids: Vec<&[u8]>, ns: Vec<U128>, buyer_account: &Address) -> bool {
+pub fn buy_dtokens(
+    resource_ids: Vec<&[u8]>,
+    ns: Vec<U128>,
+    buyer_account: &Address,
+    payer: &Address,
+) -> bool {
     let l = resource_ids.len();
     assert_eq!(l, ns.len());
     for i in 0..l {
-        assert!(buy_dtoken(resource_ids[i], ns[i], buyer_account));
+        assert!(buy_dtoken(resource_ids[i], ns[i], buyer_account, payer));
     }
     true
 }
@@ -318,12 +323,13 @@ fn buy_dtokens_and_set_agents(
     authorized_token_template_bytes: &[u8],
     use_template_bytes: &[u8],
     buyer_account: &Address,
+    payer: &Address,
     agent: &Address,
 ) -> bool {
     let l = resource_ids.len();
     assert_eq!(l, ns.len());
     for i in 0..l {
-        assert!(buy_dtoken(resource_ids[i], ns[i], buyer_account));
+        assert!(buy_dtoken(resource_ids[i], ns[i], buyer_account, payer));
     }
     assert!(set_token_agents(
         resource_ids[authorized_index as usize],
@@ -353,6 +359,35 @@ fn get_token_templates_endpoint(resource_id: &[u8]) -> Vec<u8> {
     }
     return sink.bytes().to_vec();
 }
+
+pub fn buy_use_token(
+    resource_id: &[u8],
+    n: U128,
+    buyer_account: &Address,
+    payer: &Address,
+) -> bool {
+    assert!(buy_dtoken(resource_id, n, buyer_account, payer));
+    let item_info =
+        database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
+            .unwrap();
+    for token_template in item_info.item.templates.iter() {
+        assert!(use_token(
+            resource_id,
+            buyer_account,
+            token_template.to_bytes().as_slice(),
+            n
+        ));
+    }
+    EventBuilder::new()
+        .string("buyAndUseToken")
+        .bytearray(resource_id)
+        .number(n)
+        .address(buyer_account)
+        .address(payer)
+        .notify();
+    true
+}
+
 /// buy dtoken
 ///
 /// `resource_id` used to mark the only commodity in the chain
@@ -360,8 +395,8 @@ fn get_token_templates_endpoint(resource_id: &[u8]) -> Vec<u8> {
 /// `n` is the number of purchases
 ///
 /// `buyer_account` is buyer address, need this address signature
-pub fn buy_dtoken(resource_id: &[u8], n: U128, buyer_account: &Address) -> bool {
-    assert!(runtime::check_witness(buyer_account));
+pub fn buy_dtoken(resource_id: &[u8], n: U128, buyer_account: &Address, payer: &Address) -> bool {
+    assert!(runtime::check_witness(buyer_account) && runtime::check_witness(payer));
     let mut item_info =
         database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
             .unwrap();
@@ -378,7 +413,7 @@ pub fn buy_dtoken(resource_id: &[u8], n: U128, buyer_account: &Address) -> bool 
     };
     assert!(transfer_fee(
         &oi,
-        buyer_account,
+        payer,
         item_info.resource_ddo.mp_contract_address.clone(),
         &item_info
             .resource_ddo
@@ -407,6 +442,7 @@ pub fn buy_dtoken(resource_id: &[u8], n: U128, buyer_account: &Address) -> bool 
         .bytearray(resource_id)
         .number(n)
         .address(buyer_account)
+        .address(payer)
         .notify();
     true
 }
@@ -838,8 +874,8 @@ pub fn invoke() {
             ));
         }
         b"buyDtokens" => {
-            let (resource_ids, ns, buyer) = source.read().unwrap();
-            sink.write(buy_dtokens(resource_ids, ns, buyer));
+            let (resource_ids, ns, buyer, payer) = source.read().unwrap();
+            sink.write(buy_dtokens(resource_ids, ns, buyer, payer));
         }
         b"buyDtokensAndSetAgents" => {
             let (
@@ -850,6 +886,7 @@ pub fn invoke() {
                 authorized_token_template_bytes,
                 use_template_bytes,
                 buyer,
+                payer,
                 agent,
             ) = source.read().unwrap();
             sink.write(buy_dtokens_and_set_agents(
@@ -860,12 +897,17 @@ pub fn invoke() {
                 authorized_token_template_bytes,
                 use_template_bytes,
                 buyer,
+                payer,
                 agent,
             ));
         }
         b"buyDtoken" => {
-            let (resource_id, n, buyer_account) = source.read().unwrap();
-            sink.write(buy_dtoken(resource_id, n, buyer_account));
+            let (resource_id, n, buyer_account, payer) = source.read().unwrap();
+            sink.write(buy_dtoken(resource_id, n, buyer_account, payer));
+        }
+        b"buyAndUseToken" => {
+            let (resource_id, n, buyer_account, payer) = source.read().unwrap();
+            sink.write(buy_use_token(resource_id, n, buyer_account, payer));
         }
         b"getTokenTemplates" => {
             let resource_id = source.read().unwrap();
