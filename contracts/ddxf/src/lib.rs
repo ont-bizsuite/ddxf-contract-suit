@@ -365,19 +365,15 @@ pub fn buy_use_token(
     n: U128,
     buyer_account: &Address,
     payer: &Address,
+    token_template_bytes: &[u8],
 ) -> bool {
     assert!(buy_dtoken(resource_id, n, buyer_account, payer));
-    let item_info =
-        database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
-            .unwrap();
-    for token_template in item_info.item.templates.iter() {
-        assert!(use_token(
-            resource_id,
-            buyer_account,
-            token_template.to_bytes().as_slice(),
-            n
-        ));
-    }
+    assert!(use_token(
+        resource_id,
+        buyer_account,
+        token_template_bytes,
+        n
+    ));
     EventBuilder::new()
         .string("buyAndUseToken")
         .bytearray(resource_id)
@@ -420,6 +416,67 @@ pub fn buy_dtoken(resource_id: &[u8], n: U128, buyer_account: &Address, payer: &
             .split_policy_contract_address
             .unwrap_or(get_split_policy_contract()),
         item_info.item.fee.clone(),
+        n
+    ));
+    database::put(
+        utils::generate_seller_item_info_key(resource_id),
+        &item_info,
+    );
+    let dtoken = get_dtoken_contract();
+    assert!(generate_dtoken(
+        &item_info
+            .resource_ddo
+            .dtoken_contract_address
+            .unwrap_or(dtoken),
+        buyer_account,
+        resource_id,
+        &item_info.item.get_templates_bytes(),
+        n
+    ));
+    EventBuilder::new()
+        .string("buyDtoken")
+        .bytearray(resource_id)
+        .number(n)
+        .address(buyer_account)
+        .address(payer)
+        .notify();
+    true
+}
+
+pub fn buy_dtoken_reward(
+    resource_id: &[u8],
+    n: U128,
+    buyer_account: &Address,
+    payer: &Address,
+    unit_price: U128,
+) -> bool {
+    assert!(runtime::check_witness(buyer_account) && runtime::check_witness(payer));
+    let mut item_info =
+        database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
+            .unwrap();
+    assert!(item_info.resource_ddo.is_freeze == false);
+    assert!(item_info.item.fee.count == 0);
+    let now = runtime::timestamp();
+    assert!(now < item_info.item.expired_date);
+
+    assert!(item_info.item.sold < item_info.item.stocks);
+    item_info.item.sold = n.checked_add(item_info.item.sold as U128).unwrap() as u32;
+    assert!(item_info.item.sold <= item_info.item.stocks);
+    let oi = OrderId {
+        item_id: resource_id.to_vec(),
+        tx_hash: current_txhash(),
+    };
+    let mut fee = item_info.item.fee.clone();
+    fee.count = unit_price as u64;
+    assert!(transfer_fee(
+        &oi,
+        payer,
+        item_info.resource_ddo.mp_contract_address.clone(),
+        &item_info
+            .resource_ddo
+            .split_policy_contract_address
+            .unwrap_or(get_split_policy_contract()),
+        fee,
         n
     ));
     database::put(
@@ -905,9 +962,26 @@ pub fn invoke() {
             let (resource_id, n, buyer_account, payer) = source.read().unwrap();
             sink.write(buy_dtoken(resource_id, n, buyer_account, payer));
         }
+        b"buyDtokenReward" => {
+            let (resource_id, n, buyer_account, payer, unit_price) = source.read().unwrap();
+            sink.write(buy_dtoken_reward(
+                resource_id,
+                n,
+                buyer_account,
+                payer,
+                unit_price,
+            ));
+        }
         b"buyAndUseToken" => {
-            let (resource_id, n, buyer_account, payer) = source.read().unwrap();
-            sink.write(buy_use_token(resource_id, n, buyer_account, payer));
+            let (resource_id, n, buyer_account, payer, token_template_bytes) =
+                source.read().unwrap();
+            sink.write(buy_use_token(
+                resource_id,
+                n,
+                buyer_account,
+                payer,
+                token_template_bytes,
+            ));
         }
         b"getTokenTemplates" => {
             let resource_id = source.read().unwrap();
