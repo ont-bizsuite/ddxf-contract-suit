@@ -215,7 +215,7 @@ fn publish() {
 
     handle.witness(&[buyer.clone()]);
     //    assert!(buy_dtoken(resource_id, 1, &buyer));
-    assert!(buy_dtokens(vec![resource_id], vec![1], &buyer));
+    assert!(buy_dtokens(vec![resource_id], vec![1], &buyer, &buyer));
 
     handle.witness(&[buyer.clone(), buyer2.clone()]);
     assert!(buy_dtoken_from_reseller(resource_id, 1, &buyer2, &buyer));
