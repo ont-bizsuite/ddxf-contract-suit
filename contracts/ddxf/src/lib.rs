@@ -207,7 +207,7 @@ pub fn dtoken_seller_publish(
     true
 }
 
-fn freeze_publish(
+fn freeze_and_publish(
     old_resource_id: &[u8],
     new_resource_id: &[u8],
     resource_ddo_bytes: &[u8],
@@ -947,10 +947,10 @@ pub fn invoke() {
             let resource_id = source.read().unwrap();
             sink.write(freeze(resource_id));
         }
-        b"freezePublish" => {
+        b"freezeAndPublish" => {
             let (old_resource_id, new_resource_id, resource_ddo, item, split_policy_param_bytes) =
                 source.read().unwrap();
-            sink.write(freeze_publish(
+            sink.write(freeze_and_publish(
                 old_resource_id,
                 new_resource_id,
                 resource_ddo,
