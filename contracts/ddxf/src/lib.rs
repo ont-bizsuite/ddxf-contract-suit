@@ -207,6 +207,23 @@ pub fn dtoken_seller_publish(
     true
 }
 
+fn freeze_publish(
+    old_resource_id: &[u8],
+    new_resource_id: &[u8],
+    resource_ddo_bytes: &[u8],
+    item_bytes: &[u8],
+    split_policy_param_bytes: &[u8],
+) -> bool {
+    assert!(freeze(old_resource_id));
+    assert!(dtoken_seller_publish(
+        new_resource_id,
+        resource_ddo_bytes,
+        item_bytes,
+        split_policy_param_bytes
+    ));
+    true
+}
+
 fn freeze(resource_id: &[u8]) -> bool {
     let mut item_info =
         database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
@@ -443,6 +460,15 @@ pub fn buy_dtoken(resource_id: &[u8], n: U128, buyer_account: &Address, payer: &
     true
 }
 
+/// buy_dtoken_reward
+///
+/// `resource_id` used to mark the only commodity in the chain
+///
+/// `n` is the number of purchases
+///
+/// `buyer_account` is buyer address, need this address signature
+/// `payer` is the address who pay the fee
+/// `unit_price` unit price the buyer is willing to pay
 pub fn buy_dtoken_reward(
     resource_id: &[u8],
     n: U128,
@@ -920,6 +946,17 @@ pub fn invoke() {
         b"freeze" => {
             let resource_id = source.read().unwrap();
             sink.write(freeze(resource_id));
+        }
+        b"freezePublish" => {
+            let (old_resource_id, new_resource_id, resource_ddo, item, split_policy_param_bytes) =
+                source.read().unwrap();
+            sink.write(freeze_publish(
+                old_resource_id,
+                new_resource_id,
+                resource_ddo,
+                item,
+                split_policy_param_bytes,
+            ));
         }
         b"buyDtokenFromReseller" => {
             let (resource_id, n, buyer_account, reseller_account) = source.read().unwrap();
