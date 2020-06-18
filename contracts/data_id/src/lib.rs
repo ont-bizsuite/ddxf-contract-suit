@@ -65,6 +65,13 @@ pub fn register_data_id(info_bytes: &[u8]) -> bool {
     true
 }
 
+pub fn register_data_id_array(info_bytes: Vec<Vec<u8>>) -> bool {
+    for info in info_bytes.iter() {
+        assert!(register_data_id(info));
+    }
+    true
+}
+
 /// query data id info by data id
 pub fn get_data_id_info(id: Vec<u8>) -> DataIdInfo {
     database::get::<_, DataIdInfo>(utils::generate_data_id_key(id.as_slice()))
@@ -95,6 +102,10 @@ pub fn invoke() {
         b"registerDataId" => {
             let data_id_bytes: &[u8] = source.read().unwrap();
             sink.write(register_data_id(data_id_bytes));
+        }
+        b"registerDataIdArray" => {
+            let data_id_bytes: Vec<Vec<u8>> = source.read().unwrap();
+            sink.write(register_data_id_array(data_id_bytes));
         }
         b"getDataIdInfo" => {
             let data_id: Vec<u8> = source.read().unwrap();
