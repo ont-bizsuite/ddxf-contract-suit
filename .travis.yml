@@ -6,7 +6,7 @@ before_script:
 - rustup target add wasm32-unknown-unknown
 
 script:
-    - pushd ./contracts/ddxf && cargo build --release --target=wasm32-unknown-unknown && popd
+    - pushd ./contracts/marketplace && cargo build --release --target=wasm32-unknown-unknown && popd
 
 after_success: |
     [ $TRAVIS_BRANCH = master ] &&

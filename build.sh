@@ -1,4 +1,4 @@
-cd ./contracts/openkg
+cd ./contracts/split_policy
 
 cargo build --release --target=wasm32-unknown-unknown
 
