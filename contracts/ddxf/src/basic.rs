@@ -4,19 +4,13 @@ use super::ostd::types::{Address, H256};
 use common::{Fee, TokenTemplate, RT};
 
 #[derive(Clone, Encoder, Decoder)]
-pub struct TokenResourceTyEndpoint {
-    pub token_template: TokenTemplate,
-    pub resource_type: RT,
-    pub endpoint: Vec<u8>,
-}
-
-#[derive(Clone, Encoder, Decoder)]
 pub struct ResourceDDO {
-    pub manager: Address,                                          // data owner
-    pub token_resource_ty_endpoints: Vec<TokenResourceTyEndpoint>, // RT for tokens
+    pub manager: Address, // data owner
+    pub endpoint: Vec<u8>,
+    pub token_template: Vec<TokenTemplate>,
     pub item_meta_hash: H256,
-    pub dtoken_contract_address: Option<Address>, // can not be empty
-    pub mp_contract_address: Option<Address>,     // can be empty
+    pub dtoken_contract_address: Option<Vec<Address>>, // can be empty
+    pub mp_contract_address: Option<Address>,          // can be empty
     pub split_policy_contract_address: Option<Address>, //can be empty
     pub is_freeze: bool,
 }

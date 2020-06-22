@@ -39,10 +39,12 @@ const KEY_DTOKEN_CONTRACT: &[u8] = b"03";
 const KEY_SPLIT_POLICY_CONTRACT: &[u8] = b"04";
 const KEY_ADMIN: &[u8] = b"05";
 
-const ADMIN: Address = ostd::macros::base58!("AYnhakv7kC9R5ppw65JoE2rt6xDzCjCTvD");
-const DEFAULT_SPLIT_CONTRACT: Address = ostd::macros::base58!("AYnhakv7kC9R5ppw65JoE2rt6xDzCjCTvD");
+//AbtTQJYKfQxq4UdygDsbLVjE8uRrJ2H3tP
+//AYnhakv7kC9R5ppw65JoE2rt6xDzCjCTvD
+const ADMIN: Address = ostd::macros::base58!("Aejfo7ZX5PVpenRj23yChnyH64nf8T1zbu");
+const DEFAULT_SPLIT_CONTRACT: Address = ostd::macros::base58!("ANNA5KBoRaY2PbKuHYZJCedZ6NkpJN2tYh");
 const DEFAULT_DTOKEN_CONTRACT: Address =
-    ostd::macros::base58!("AYnhakv7kC9R5ppw65JoE2rt6xDzCjCTvD");
+    ostd::macros::base58!("AR91qGoLrLqhb1CJ5MztpwfpdDveAEDJU5");
 
 /// set dtoken contract address as the default dtoken contract address,
 /// ddxf contract will invoke dtoken contract to pay the fee
@@ -204,23 +206,6 @@ pub fn dtoken_seller_publish(
     let mut sink2 = Sink::new(16);
     sink2.write(item);
     events::dtoken_seller_publish_event(resource_id, sink.bytes(), sink2.bytes());
-    true
-}
-
-fn freeze_and_publish(
-    old_resource_id: &[u8],
-    new_resource_id: &[u8],
-    resource_ddo_bytes: &[u8],
-    item_bytes: &[u8],
-    split_policy_param_bytes: &[u8],
-) -> bool {
-    assert!(freeze(old_resource_id));
-    assert!(dtoken_seller_publish(
-        new_resource_id,
-        resource_ddo_bytes,
-        item_bytes,
-        split_policy_param_bytes
-    ));
     true
 }
 
@@ -391,13 +376,6 @@ pub fn buy_use_token(
         token_template_bytes,
         n
     ));
-    EventBuilder::new()
-        .string("buyAndUseToken")
-        .bytearray(resource_id)
-        .number(n)
-        .address(buyer_account)
-        .address(payer)
-        .notify();
     true
 }
 
