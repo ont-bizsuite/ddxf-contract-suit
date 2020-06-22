@@ -1,5 +1,5 @@
 use super::ostd::contract::wasm;
-use super::{verify_result, Address, Vec, U128};
+use super::{verify_result, Address, U128};
 
 pub fn transfer_dtoken(
     contract_address: &Address,

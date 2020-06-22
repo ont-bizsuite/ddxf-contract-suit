@@ -2,12 +2,15 @@
 #![feature(proc_macro_hygiene)]
 extern crate alloc;
 extern crate ontio_std as ostd;
-use ostd::abi::{EventBuilder, Sink, Source};
+use ostd::abi::{Sink, Source};
 use ostd::contract::wasm;
 use ostd::database;
+use ostd::prelude::*;
 use ostd::runtime;
+use ostd::runtime::check_witness;
 use ostd::types::{Address, U128};
 
+const ADMIN: Address = ostd::macros::base58!("Aejfo7ZX5PVpenRj23yChnyH64nf8T1zbu");
 const MP_CONTRACT_ADDRESS: Address = ostd::macros::base58!("Aejfo7ZX5PVpenRj23yChnyH64nf8T1zbu");
 const DTOKEN_CONTRACT_ADDRESS: Address =
     ostd::macros::base58!("Aejfo7ZX5PVpenRj23yChnyH64nf8T1zbu");
@@ -19,8 +22,20 @@ fn get_mp_contract_addr() -> Address {
     database::get::<_, Address>(KEY_MP_CONTRACT).unwrap_or(MP_CONTRACT_ADDRESS)
 }
 
+fn set_mp_contract_addr(mp: &Address) -> bool {
+    assert!(check_witness(&ADMIN));
+    database::put(KEY_MP_CONTRACT, mp);
+    true
+}
+
 fn get_dtoken_contract_addr() -> Address {
-    database::get::<_, Address>(KEY_DTOKEN_CONTRACT).unwrap_or(MP_CONTRACT_ADDRESS)
+    database::get::<_, Address>(KEY_DTOKEN_CONTRACT).unwrap_or(DTOKEN_CONTRACT_ADDRESS)
+}
+
+fn set_dtoken_contract_addr(dtoken: &Address) -> bool {
+    assert!(check_witness(&ADMIN));
+    database::put(KEY_DTOKEN_CONTRACT, dtoken);
+    true
 }
 
 fn freeze_and_publish(
@@ -55,7 +70,6 @@ pub fn buy_use_token(
     token_template_bytes: &[u8],
 ) -> bool {
     //call market place
-    assert!(buy_dtoken(resource_id, n, buyer_account, payer));
     let mp = get_mp_contract_addr();
     verify_result(wasm::call_contract(
         &mp,
@@ -69,6 +83,55 @@ pub fn buy_use_token(
         (
             "useToken",
             (resource_id, buyer_account, token_template_bytes, n),
+        ),
+    ));
+    true
+}
+
+fn buy_dtokens_and_set_agents(
+    resource_ids: Vec<&[u8]>,
+    ns: Vec<U128>,
+    use_index: U128,
+    authorized_index: U128,
+    authorized_token_template_bytes: &[u8],
+    use_template_bytes: &[u8],
+    buyer_account: &Address,
+    payer: &Address,
+    agent: &Address,
+) -> bool {
+    let mp = get_mp_contract_addr();
+    let l = resource_ids.len();
+    assert_eq!(l, ns.len());
+    for i in 0..l {
+        verify_result(wasm::call_contract(
+            &mp,
+            ("buyDtoken", (resource_ids[i], ns[i], buyer_account, payer)),
+        ));
+    }
+    let dtoken = get_dtoken_contract_addr();
+    verify_result(wasm::call_contract(
+        &dtoken,
+        (
+            "setTokenAgents",
+            (
+                resource_ids[authorized_index as usize],
+                buyer_account,
+                vec![agent.clone()],
+                authorized_token_template_bytes,
+                ns[authorized_index as usize],
+            ),
+        ),
+    ));
+    verify_result(wasm::call_contract(
+        &dtoken,
+        (
+            "useToken",
+            (
+                resource_ids[use_index as usize],
+                buyer_account,
+                use_template_bytes,
+                ns[use_index as usize],
+            ),
         ),
     ));
     true
@@ -91,6 +154,14 @@ fn invoke() {
     let action: &[u8] = source.read().unwrap();
     let mut sink = Sink::new(12);
     match action {
+        b"set_dtoken_contract_addr" => {
+            let dtoken = source.read().unwrap();
+            sink.write(set_dtoken_contract_addr(dtoken));
+        }
+        b"" => {
+            let mp = source.read().unwrap();
+            sink.write(set_mp_contract_addr(mp));
+        }
         b"freezeAndPublish" => {
             let (old_resource_id, new_resource_id, resource_ddo, item, split_policy_param_bytes) =
                 source.read().unwrap();
@@ -111,6 +182,30 @@ fn invoke() {
                 buyer_account,
                 payer,
                 token_template_bytes,
+            ));
+        }
+        b"buyDtokensAndSetAgents" => {
+            let (
+                resource_ids,
+                ns,
+                use_index,
+                authorized_index,
+                authorized_token_template_bytes,
+                use_template_bytes,
+                buyer,
+                payer,
+                agent,
+            ) = source.read().unwrap();
+            sink.write(buy_dtokens_and_set_agents(
+                resource_ids,
+                ns,
+                use_index,
+                authorized_index,
+                authorized_token_template_bytes,
+                use_template_bytes,
+                buyer,
+                payer,
+                agent,
             ));
         }
         _ => {

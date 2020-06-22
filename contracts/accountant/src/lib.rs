@@ -2,7 +2,7 @@
 #![feature(proc_macro_hygiene)]
 extern crate alloc;
 extern crate ontio_std as ostd;
-use ostd::abi::{Decoder, Encoder, Error, Sink, Source};
+use ostd::abi::{Decoder, Encoder, Sink, Source};
 use ostd::contract::{ong, ont, wasm};
 use ostd::database;
 use ostd::prelude::*;
@@ -35,7 +35,7 @@ fn set_mp(mp_account: &Address) -> bool {
 ///
 /// `fee_split_model` is the charging model that is agreed by the seller and MP
 fn set_fee_split_model(seller_acc: &Address, fee_split_model: FeeSplitModel) -> bool {
-    assert!(fee_split_model.percentage <= MAX_PERCENTAGE as u16);
+    assert!(fee_split_model.weight <= MAX_PERCENTAGE as u16);
     let mp = get_mp_account();
     assert!(check_witness(seller_acc) && check_witness(&mp));
     let mp = database::get::<_, Address>(KEY_MP).unwrap();
@@ -50,7 +50,7 @@ fn set_fee_split_model(seller_acc: &Address, fee_split_model: FeeSplitModel) -> 
 /// query seller's charging model by seller's address
 fn get_fee_split_model(seller_acc: &Address) -> FeeSplitModel {
     database::get::<_, FeeSplitModel>(utils::generate_fee_split_model_key(seller_acc))
-        .unwrap_or(FeeSplitModel { percentage: 0 })
+        .unwrap_or(FeeSplitModel { weight: 0 })
 }
 
 /// transfer fee to the contract and register the income distribution balance of this order
@@ -113,7 +113,7 @@ fn settle(seller_acc: &Address, order_id: &[u8]) -> bool {
     let fee_split = get_fee_split_model(seller_acc);
     let fee = info.fee;
     let total = info.n.checked_mul(fee.count as U128).unwrap();
-    let mp_fee = total.checked_mul(fee_split.percentage as U128).unwrap();
+    let mp_fee = total.checked_mul(fee_split.weight as U128).unwrap();
     let mp_amt = mp_fee.checked_div(MAX_PERCENTAGE).unwrap();
     if mp_amt != 0 {
         assert!(transfer(

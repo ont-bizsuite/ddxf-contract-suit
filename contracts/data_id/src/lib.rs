@@ -7,8 +7,6 @@ use ostd::database;
 use ostd::prelude::*;
 use ostd::runtime::{input, ret};
 use ostd::types::H256;
-extern crate common;
-use common::RT;
 
 const KEY_DATA_ID: &[u8] = b"01";
 
