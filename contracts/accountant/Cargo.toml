@@ -3,10 +3,13 @@ name = "accountant"
 version = "0.1.0"
 authors = ["lucas7788 <sishsh@163.com>"]
 edition = "2018"
+<<<<<<< HEAD
 license = "Apache-2.0/MIT"
 homepage = "https://github.com/ont-bizsuite/ddxf-contract-suite"
 repository = "https://github.com/ont-bizsuite/ddxf-contract-suite"
 description = "ddxf protocol implement"
+=======
+>>>>>>> ab8d5fc1b4b21d2c72e64747cb81cfc5a7f7cd54
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -16,8 +19,9 @@ crate-type = ["cdylib"] #Compile as a dynamic link library
 
 [dependencies]
 #ontio-std = {path="/Users/sss/dev/dockerData/rust_project/ontio-cdk-1/ontio-std"}
-common = {path="../../common", version = "0.1.0"}
-ontio-std = {git = "https://github.com/ontio/ontology-wasm-cdt-rust.git", version = "0.1.0"}
+#ontio-std = {git = "https://github.com/lucas7788/ontio-cdk-1.git", branch="update_event"}
+common = {path="../../common"}
+ontio-std = {git = "https://github.com/ontio/ontology-wasm-cdt-rust.git"}
 
 [features]
 mock = ["ontio-std/mock"]
