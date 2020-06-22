@@ -18,7 +18,7 @@ use common::{Fee, OrderId, TokenType};
 mod test;
 
 const MAX_PERCENTAGE: U128 = 10000;
-const ADMIN: Address = ostd::macros::base58!("AbtTQJYKfQxq4UdygDsbLVjE8uRrJ2H3tP");
+const ADMIN: Address = ostd::macros::base58!("Aejfo7ZX5PVpenRj23yChnyH64nf8T1zbu");
 
 fn set_mp(mp_account: &Address) -> bool {
     assert!(check_witness(&ADMIN));
