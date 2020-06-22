@@ -82,7 +82,6 @@ pub fn generate_dtoken(account: &Address, templates_bytes: &[u8], n: U128) -> bo
     }
     EventBuilder::new()
         .string("generateDToken")
-        .bytearray(resource_id)
         .address(account)
         .number(n)
         .notify();
@@ -99,7 +98,7 @@ pub fn generate_dtoken(account: &Address, templates_bytes: &[u8], n: U128) -> bo
 ///
 /// `n` represents the number of consuming token
 pub fn use_token(account: &Address, token_template_bytes: &[u8], n: U128) -> bool {
-    check_caller();
+    assert!(check_witness(account));
     let mut caa = get_count_and_agent(account, token_template_bytes);
     assert!(caa.count >= n as u32);
     caa.count -= n as u32;
@@ -111,7 +110,6 @@ pub fn use_token(account: &Address, token_template_bytes: &[u8], n: U128) -> boo
     }
     EventBuilder::new()
         .string("useToken")
-        .bytearray(resource_id)
         .address(account)
         .number(n)
         .notify();
@@ -135,7 +133,7 @@ pub fn use_token_by_agent(
     token_template_bytes: &[u8],
     n: U128,
 ) -> bool {
-    check_caller();
+    assert!(check_witness(account));
     let mut caa = get_count_and_agent(account, token_template_bytes);
     assert!(caa.count >= n as u32);
     let agent_count = caa.agents.get_mut(agent).unwrap();
@@ -149,7 +147,6 @@ pub fn use_token_by_agent(
     }
     EventBuilder::new()
         .string("useTokenByAgent")
-        .bytearray(resource_id)
         .address(account)
         .number(n)
         .notify();
@@ -162,7 +159,7 @@ pub fn transfer_dtoken(
     templates_bytes: &[u8],
     n: U128,
 ) -> bool {
-    check_caller();
+    assert!(check_witness(from_account));
     let mut source = Source::new(templates_bytes);
     let templates: Vec<TokenTemplate> = source.read().unwrap();
     for token_template in templates.iter() {
@@ -191,18 +188,17 @@ pub fn transfer_dtoken(
 /// `token_template_bytes` is array of TokenTemplate
 pub fn set_agents(
     account: &Address,
-    resource_id: &[u8],
     agents: Vec<Address>,
     n: U128,
     token_templates_bytes: &[u8],
 ) -> bool {
+    assert!(check_witness(account));
     let mut source = Source::new(token_templates_bytes);
     let token_templates: Vec<TokenTemplate> = source.read().unwrap();
-    check_caller();
+    assert!(check_witness(account));
     for token_template in token_templates.iter() {
         assert!(set_token_agents(
             account,
-            resource_id,
             &token_template.to_bytes(),
             agents.clone(),
             n
@@ -224,18 +220,16 @@ pub fn set_agents(
 /// `n` represents the number of authorized token
 pub fn set_token_agents(
     account: &Address,
-    resource_id: &[u8],
     token_template_bytes: &[u8],
     agents: Vec<Address>,
     n: U128,
 ) -> bool {
-    check_caller();
+    assert!(check_witness(account));
     let mut caa = get_count_and_agent(account, token_template_bytes);
     caa.set_token_agents(agents.as_slice(), n);
     update_count(account, token_template_bytes, caa);
     EventBuilder::new()
         .string("setTokenAgents")
-        .bytearray(resource_id)
         .address(account)
         .number(n)
         .notify();
@@ -257,6 +251,7 @@ pub fn add_agents(
     n: U128,
     token_templates_bytes: &[u8],
 ) -> bool {
+    assert!(check_witness(account));
     let mut source = Source::new(token_templates_bytes);
     let token_templates: Vec<TokenTemplate> = source.read().unwrap();
     for token_template in token_templates.iter() {
@@ -287,13 +282,12 @@ pub fn add_token_agents(
     agents: &[Address],
     n: U128,
 ) -> bool {
-    check_caller();
+    assert!(check_witness(account));
     let mut caa = get_count_and_agent(account, token_template_bytes);
     caa.add_agents(agents, n as u32);
     update_count(account, token_template_bytes, caa);
     EventBuilder::new()
         .string("addTokenAgents")
-        .bytearray(resource_id)
         .address(account)
         .number(n)
         .notify();
@@ -314,6 +308,7 @@ pub fn remove_agents(
     agents: Vec<Address>,
     token_templates_bytes: &[u8],
 ) -> bool {
+    assert!(check_witness(account));
     let mut source = Source::new(token_templates_bytes);
     let token_templates: Vec<TokenTemplate> = source.read().unwrap();
     for token_template in token_templates.iter() {
@@ -340,13 +335,12 @@ pub fn remove_token_agents(
     token_template_bytes: &[u8],
     agents: &[Address],
 ) -> bool {
-    check_caller();
+    assert!(check_witness(account));
     let mut caa = get_count_and_agent(account, token_template_bytes);
     caa.remove_agents(agents);
     update_count(account, token_template_bytes, caa);
     EventBuilder::new()
         .string("removeTokenAgents")
-        .bytearray(resource_id)
         .address(account)
         .notify();
     true
@@ -411,24 +405,23 @@ pub fn invoke() {
             sink.write(migrate(code, vm_type, name, version, author, email, desc));
         }
         b"generateDToken" => {
-            let (account, resource_id, templates, n) = source.read().unwrap();
+            let (account, templates, n) = source.read().unwrap();
             sink.write(generate_dtoken(account, templates, n));
         }
         b"getCountAndAgent" => {
-            let (resource_id, account, token_template) = source.read().unwrap();
+            let (account, token_template) = source.read().unwrap();
             sink.write(get_count_and_agent(account, token_template));
         }
         b"useToken" => {
-            let (account, resource_id, token_template, n) = source.read().unwrap();
+            let (account, token_template, n) = source.read().unwrap();
             sink.write(use_token(account, token_template, n));
         }
         b"useTokenByAgent" => {
-            let (account, agent, resource_id, token_template, n) = source.read().unwrap();
+            let (account, agent, token_template, n) = source.read().unwrap();
             sink.write(use_token_by_agent(account, agent, token_template, n));
         }
         b"transferDToken" => {
-            let (from_account, to_account, resource_id, templates_bytes, n) =
-                source.read().unwrap();
+            let (from_account, to_account, templates_bytes, n) = source.read().unwrap();
             sink.write(transfer_dtoken(
                 from_account,
                 to_account,
@@ -437,31 +430,20 @@ pub fn invoke() {
             ));
         }
         b"setAgents" => {
-            let (account, resource_id, agents, n, token_templates) = source.read().unwrap();
-            sink.write(set_agents(account, resource_id, agents, n, token_templates));
+            let (account, agents, n, token_templates) = source.read().unwrap();
+            sink.write(set_agents(account, agents, n, token_templates));
         }
         b"setTokenAgents" => {
-            let (account, resource_id, token_template, agents, n) = source.read().unwrap();
-            sink.write(set_token_agents(
-                account,
-                resource_id,
-                token_template,
-                agents,
-                n,
-            ));
+            let (account, token_template, agents, n) = source.read().unwrap();
+            sink.write(set_token_agents(account, token_template, agents, n));
         }
         b"addAgents" => {
-            let (account, resource_id, agents, n, token_templates) = source.read().unwrap();
+            let (account, agents, n, token_templates) = source.read().unwrap();
             sink.write(add_agents(account, agents, n, token_templates));
         }
         b"addTokenAgents" => {
-            let (account, resource_id, token_template, agents, n): (
-                &Address,
-                &[u8],
-                &[u8],
-                Vec<Address>,
-                U128,
-            ) = source.read().unwrap();
+            let (account, token_template, agents, n): (&Address, &[u8], Vec<Address>, U128) =
+                source.read().unwrap();
             sink.write(add_token_agents(
                 account,
                 token_template,
@@ -470,16 +452,12 @@ pub fn invoke() {
             ));
         }
         b"removeAgents" => {
-            let (account, resource_id, agents, token_templates) = source.read().unwrap();
+            let (account, agents, token_templates) = source.read().unwrap();
             sink.write(remove_agents(account, agents, token_templates));
         }
         b"removeTokenAgents" => {
-            let (account, resource_id, token_template, agents): (
-                &Address,
-                &[u8],
-                &[u8],
-                Vec<Address>,
-            ) = source.read().unwrap();
+            let (account, token_template, agents): (&Address, &[u8], Vec<Address>) =
+                source.read().unwrap();
             sink.write(remove_token_agents(
                 account,
                 token_template,

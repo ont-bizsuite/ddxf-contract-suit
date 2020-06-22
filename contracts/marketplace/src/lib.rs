@@ -31,9 +31,6 @@ use ostd::runtime::{check_witness, contract_migrate, current_txhash};
 #[cfg(test)]
 mod test;
 
-const SHA256_SIZE: u32 = 32;
-const CRC32_SIZE: u32 = 4;
-
 const KEY_SELLER_ITEM_INFO: &[u8] = b"01";
 const KEY_DTOKEN_CONTRACT: &[u8] = b"03";
 const KEY_SPLIT_POLICY_CONTRACT: &[u8] = b"04";
@@ -151,12 +148,30 @@ pub fn dtoken_seller_publish(
     item_bytes: &[u8],
     split_policy_param_bytes: &[u8],
 ) -> bool {
+    dtoken_seller_publish_inner(
+        resource_id,
+        resource_ddo_bytes,
+        item_bytes,
+        split_policy_param_bytes,
+        true,
+    )
+}
+
+pub fn dtoken_seller_publish_inner(
+    resource_id: &[u8],
+    resource_ddo_bytes: &[u8],
+    item_bytes: &[u8],
+    split_policy_param_bytes: &[u8],
+    is_publish: bool,
+) -> bool {
     let resource_ddo = ResourceDDO::from_bytes(resource_ddo_bytes);
     let item = DTokenItem::from_bytes(item_bytes);
     assert!(runtime::check_witness(&resource_ddo.manager));
     let resource =
         database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id));
-    assert!(resource.is_none());
+    if is_publish {
+        assert!(resource.is_none());
+    }
     assert_ne!(item.token_templates.len(), 0);
 
     let seller = SellerItemInfo::new(item.clone(), resource_ddo.clone());
@@ -183,7 +198,40 @@ pub fn dtoken_seller_publish(
     sink.write(resource_ddo);
     let mut sink2 = Sink::new(16);
     sink2.write(item);
-    events::dtoken_seller_publish_event(resource_id, sink.bytes(), sink2.bytes());
+    let mut method = "dtokenSellerPublish";
+    if !is_publish {
+        method = "update"
+    }
+    EventBuilder::new()
+        .string(method)
+        .bytearray(resource_id)
+        .bytearray(sink.bytes())
+        .bytearray(sink2.bytes())
+        .notify();
+    true
+}
+
+fn update(
+    resource_id: &[u8],
+    resource_ddo_bytes: &[u8],
+    item_bytes: &[u8],
+    split_policy_param_bytes: &[u8],
+) -> bool {
+    dtoken_seller_publish_inner(
+        resource_id,
+        resource_ddo_bytes,
+        item_bytes,
+        split_policy_param_bytes,
+        false,
+    )
+}
+
+fn delete(resource_id: &[u8]) -> bool {
+    let item_info =
+        database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
+            .unwrap();
+    assert!(check_witness(&item_info.resource_ddo.manager));
+    database::delete(utils::generate_seller_item_info_key(resource_id));
     true
 }
 
@@ -256,7 +304,7 @@ pub fn buy_dtoken_from_reseller(
         let l = d.len();
         for i in 0..l {
             let mut sink = Sink::new(64);
-            sink.write(vec![item_info.item.token_templates[i]]);
+            sink.write(vec![item_info.item.token_templates.get(i)]);
             assert!(transfer_dtoken(
                 d.get(i).unwrap(),
                 reseller_account,
@@ -308,60 +356,11 @@ pub fn buy_dtokens(
     true
 }
 
-fn buy_dtokens_and_set_agents(
-    resource_ids: Vec<&[u8]>,
-    ns: Vec<U128>,
-    use_index: U128,
-    authorized_index: U128,
-    authorized_token_template_bytes: &[u8],
-    use_template_bytes: &[u8],
-    buyer_account: &Address,
-    payer: &Address,
-    agent: &Address,
-) -> bool {
-    let l = resource_ids.len();
-    assert_eq!(l, ns.len());
-    for i in 0..l {
-        assert!(buy_dtoken(resource_ids[i], ns[i], buyer_account, payer));
-    }
-    assert!(set_token_agents(
-        resource_ids[authorized_index as usize],
-        buyer_account,
-        vec![agent.clone()],
-        authorized_token_template_bytes,
-        ns[authorized_index as usize],
-    ));
-    assert!(use_token(
-        resource_ids[use_index as usize],
-        buyer_account,
-        use_template_bytes,
-        ns[use_index as usize]
-    ));
-    true
-}
-
 fn get_token_templates(resource_id: &[u8]) -> Vec<TokenTemplate> {
     let item_info =
         database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
             .unwrap();
     return item_info.item.token_templates;
-}
-
-pub fn buy_use_token(
-    resource_id: &[u8],
-    n: U128,
-    buyer_account: &Address,
-    payer: &Address,
-    token_template_bytes: &[u8],
-) -> bool {
-    assert!(buy_dtoken(resource_id, n, buyer_account, payer));
-    assert!(use_token(
-        resource_id,
-        buyer_account,
-        token_template_bytes,
-        n
-    ));
-    true
 }
 
 /// buy dtoken
@@ -406,7 +405,7 @@ pub fn buy_dtoken(resource_id: &[u8], n: U128, buyer_account: &Address, payer: &
         let l = dtoken_addr.len();
         for i in 0..l {
             let mut sink = Sink::new(64);
-            sink.write(vec![item_info.item.token_templates[i]]);
+            sink.write(vec![item_info.item.token_templates.get(i)]);
             assert!(generate_dtoken(
                 &dtoken_addr[i],
                 buyer_account,
@@ -486,7 +485,7 @@ pub fn buy_dtoken_reward(
         let l = dtoken_addr.len();
         for i in 0..l {
             let mut sink = Sink::new(64);
-            sink.write(vec![item_info.item[i]]);
+            sink.write(vec![item_info.item.token_templates.get(i)]);
             assert!(generate_dtoken(
                 &dtoken_addr[i],
                 buyer_account,
@@ -509,355 +508,6 @@ pub fn buy_dtoken_reward(
         .number(n)
         .address(buyer_account)
         .address(payer)
-        .notify();
-    true
-}
-
-/// use dtoken, after buy dtoken, user can consume the token
-///
-/// `resource_id` used to mark the only commodity in the chain
-///
-/// `account` is the address who consume token, need the address signature
-///
-/// `token_template_bytes` used to mark the only token user consume
-///
-/// `n` is the number of consuming
-pub fn use_token(
-    resource_id: &[u8],
-    account: &Address,
-    token_template_bytes: &[u8],
-    n: U128,
-) -> bool {
-    assert!(runtime::check_witness(account));
-    let item_info =
-        database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
-            .unwrap();
-    if let Some(dtokens) = item_info.resource_ddo.dtoken_contract_address {
-        let i = item_info.item.token_templates.iter().position(|template|{
-            token_template_bytes == template.to_bytes()
-        }).unwrap();
-        assert!(use_token_dtoken(
-            &dtokens[i],
-            account,
-            resource_id,
-            token_template_bytes,
-            n
-        ));
-    } else {
-        let dtoken = get_dtoken_contract();
-        assert!(use_token_dtoken(
-            &dtoken,
-            account,
-            resource_id,
-            token_template_bytes,
-            n
-        ));
-    }
-    EventBuilder::new()
-        .string("useToken")
-        .bytearray(resource_id)
-        .address(account)
-        .number(n)
-        .bytearray(token_template_bytes)
-        .notify();
-    true
-}
-
-/// consume token by agent
-///
-/// `resource_id` used to mark the only commodity in the chain
-///
-/// `account` is buyer address, need the address signature
-///
-/// `agent` is the agent address who is authored to consume token
-///
-/// `token_template_bytes` used to mark the only token user consume
-///
-/// `n` is the number of consuming
-pub fn use_token_by_agent(
-    resource_id: &[u8],
-    account: &Address,
-    agent: &Address,
-    token_template_bytes: &[u8],
-    n: U128,
-) -> bool {
-    assert!(runtime::check_witness(agent));
-    let item_info =
-        database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
-            .unwrap();
-    let dtoken = get_dtoken_contract();
-    assert!(use_token_by_agent_dtoken(
-        &item_info
-            .resource_ddo
-            .dtoken_contract_address
-            .unwrap_or(dtoken),
-        account,
-        agent,
-        resource_id,
-        token_template_bytes,
-        n
-    ));
-    EventBuilder::new()
-        .string("useTokenByAgent")
-        .bytearray(resource_id)
-        .address(account)
-        .address(agent)
-        .number(n)
-        .notify();
-    true
-}
-
-/// set agent
-///
-/// `resource_id` used to mark the only commodity in the chain
-///
-/// `account` is user address who authorize the other address is agent, need account signature
-///
-/// `agent` is the array of agent address
-///
-/// `n` is number of authorizations per agent
-pub fn set_agents(resource_id: &[u8], account: &Address, agents: Vec<&Address>, n: U128) -> bool {
-    assert!(runtime::check_witness(account));
-    let item_info =
-        database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
-            .unwrap();
-    let dtoken = get_dtoken_contract();
-    assert!(set_agents_dtoken(
-        &item_info
-            .resource_ddo
-            .dtoken_contract_address
-            .unwrap_or(dtoken),
-        account,
-        resource_id,
-        agents,
-        n,
-        &item_info.item.get_templates_bytes(),
-    ));
-    true
-}
-
-/// set token agents, this method will clear the old agents
-///
-/// `resource_id` used to mark the only commodity in the chain
-///
-/// `account is` user address who authorize the other address is agent, need account signature
-///
-/// `agents` is the array of agent address
-///
-/// `template_bytes` used to mark the only token user consume
-///
-/// `n` is number of authorizations per agent
-pub fn set_token_agents(
-    resource_id: &[u8],
-    account: &Address,
-    agents: Vec<Address>,
-    template_bytes: &[u8],
-    n: U128,
-) -> bool {
-    assert!(runtime::check_witness(account));
-    let item_info =
-        database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
-            .unwrap();
-    let dtoken = get_dtoken_contract();
-    assert!(set_token_agents_dtoken(
-        &item_info
-            .resource_ddo
-            .dtoken_contract_address
-            .unwrap_or(dtoken),
-        account,
-        resource_id,
-        &template_bytes,
-        agents.as_slice(),
-        n,
-    ));
-    EventBuilder::new()
-        .string("setTokenAgents")
-        .bytearray(resource_id)
-        .address(account)
-        .number(n)
-        .notify();
-    true
-}
-
-/// add_agents, this method only append agents for the all token
-///
-/// `resource_id` used to mark the only commodity in the chain
-///
-/// `account` is user address who authorize the other address is agent, need account signature
-///
-/// `agents` is the array of agent address
-///
-/// `n` is number of authorizations per agent
-pub fn add_agents(resource_id: &[u8], account: &Address, agents: Vec<&Address>, n: U128) -> bool {
-    assert!(runtime::check_witness(account));
-    let item_info =
-        database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
-            .unwrap();
-    if let Some(dtokens) = item_info.resource_ddo.dtoken_contract_address {
-        let l = dtokens.len();
-        for i in 0..l {
-            let mut sink = Sink::new(64);
-            sink.write(vec![item_info.item.token_templates[i]]);
-            assert!(add_agents_dtoken(
-                &dtokens[i],
-                account,
-                resource_id,
-                agents,
-                n,
-                sink.bytes()
-            ));
-        }
-    } else {
-        let dtoken = get_dtoken_contract();
-        assert!(add_agents_dtoken(
-            &dtoken,
-            account,
-            resource_id,
-            agents,
-            n,
-            &item_info.item.get_templates_bytes()
-        ));
-    }
-    EventBuilder::new()
-        .string("addAgents")
-        .bytearray(resource_id)
-        .address(account)
-        .number(n)
-        .notify();
-    true
-}
-
-/// add_agents, this method only append agents for the specified token.
-///
-/// `resource_id` used to mark the only commodity in the chain
-///
-/// `account` is user address who authorize the other address is agent, need account signature
-///
-/// `token_template_bytes` used to specified which token to set agents.
-///
-/// `agents` is the array of agent address
-///
-/// `n` is number of authorizations per agent
-pub fn add_token_agents(
-    resource_id: &[u8],
-    account: &Address,
-    token_template_bytes: &[u8],
-    agents: Vec<&Address>,
-    n: U128,
-) -> bool {
-    assert!(runtime::check_witness(account));
-    let item_info =
-        database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
-            .unwrap();
-
-    if let Some(dtokens) = item_info.resource_ddo.dtoken_contract_address {
-        let i = item_info.item.token_templates.iter().position(|item| {
-            item.to_bytes().as_slice() == token_template_bytes
-        }).unwrap();
-        assert!(add_token_agents_dtoken(
-            &dtokens[i],
-            account,
-            resource_id,
-            token_template_bytes,
-            agents,
-            n
-        ));
-    } else {
-        let dtoken = get_dtoken_contract();
-        assert!(add_token_agents_dtoken(
-            &dtoken,
-            account,
-            resource_id,
-            token_template_bytes,
-            agents,
-            n
-        ));
-    }
-    EventBuilder::new()
-        .string("addTokenAgents")
-        .bytearray(resource_id)
-        .address(account)
-        .number(n)
-        .notify();
-    true
-}
-
-/// product owner remove all the agents
-///
-/// `resource_id` used to mark the only commodity in the chain
-///
-/// `account` is user address who authorize the other address is agent, need account signature
-///
-/// `agents` is the array of agent address which will be removed by account
-pub fn remove_agents(resource_id: &[u8], account: &Address, agents: Vec<&Address>) -> bool {
-    assert!(runtime::check_witness(account));
-    let item_info =
-        database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
-            .unwrap();
-
-    if let Some(dtokens) = item_info.resource_ddo.dtoken_contract_address {
-        for i in 0..dtokens.len() {
-            let mut sink = Sink::new(64);
-            sink.write(vec![&item_info.item.token_templates[i]]);
-            assert!(remove_agents_dtoken(
-                &dtokens[i],
-                account,
-                resource_id,
-                agents,
-                sink.bytes()
-            ));
-        }
-    } else {
-        let dtoken = get_dtoken_contract();
-        assert!(remove_agents_dtoken(
-            &dtoken,
-            account,
-            resource_id,
-            agents,
-            &item_info.item.get_templates_bytes()
-        ));
-    }
-    EventBuilder::new()
-        .string("removeAgents")
-        .bytearray(resource_id)
-        .address(account)
-        .notify();
-    true
-}
-
-/// product owner remove the agents of specified token
-///
-/// `resource_id` used to mark the only commodity in the chain
-///
-/// `account` is user address who authorize the other address is agent, need account signature
-///
-/// `agents` is the array of agent address which will be removed by account
-pub fn remove_token_agents(
-    resource_id: &[u8],
-    token_template_bytes: &[u8],
-    account: &Address,
-    agents: Vec<&Address>,
-) -> bool {
-    assert!(runtime::check_witness(account));
-    let item_info =
-        database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
-            .unwrap();
-    if let Some() = item_info.resource_ddo.dtoken_contract_address {
-        let i = item_info.item.token_templates.iter().position().unwrap();
-    } else {
-        let dtoken = get_dtoken_contract();
-        assert!(remove_token_agents_dtoken(
-            &dtoken,
-            account,
-            resource_id,
-            token_template_bytes,
-            agents,
-        ));
-    }
-    EventBuilder::new()
-        .string("removeTokenAgents")
-        .bytearray(resource_id)
-        .address(account)
         .notify();
     true
 }
@@ -960,6 +610,20 @@ pub fn invoke() {
             let (code, vm_type, name, version, author, email, desc) = source.read().unwrap();
             sink.write(migrate(code, vm_type, name, version, author, email, desc));
         }
+        b"update" => {
+            let (resource_id, resource_ddo, item, split_policy_param_bytes) =
+                source.read().unwrap();
+            sink.write(update(
+                resource_id,
+                resource_ddo,
+                item,
+                split_policy_param_bytes,
+            ));
+        }
+        b"delete" => {
+            let resource_id = source.read().unwrap();
+            sink.write(delete(resource_id));
+        }
         b"dtokenSellerPublish" => {
             let (resource_id, resource_ddo, item, split_policy_param_bytes) =
                 source.read().unwrap();
@@ -991,30 +655,6 @@ pub fn invoke() {
             let (resource_ids, ns, buyer, payer) = source.read().unwrap();
             sink.write(buy_dtokens(resource_ids, ns, buyer, payer));
         }
-        b"buyDtokensAndSetAgents" => {
-            let (
-                resource_ids,
-                ns,
-                use_index,
-                authorized_index,
-                authorized_token_template_bytes,
-                use_template_bytes,
-                buyer,
-                payer,
-                agent,
-            ) = source.read().unwrap();
-            sink.write(buy_dtokens_and_set_agents(
-                resource_ids,
-                ns,
-                use_index,
-                authorized_index,
-                authorized_token_template_bytes,
-                use_template_bytes,
-                buyer,
-                payer,
-                agent,
-            ));
-        }
         b"buyDtoken" => {
             let (resource_id, n, buyer_account, payer) = source.read().unwrap();
             sink.write(buy_dtoken(resource_id, n, buyer_account, payer));
@@ -1029,75 +669,9 @@ pub fn invoke() {
                 unit_price,
             ));
         }
-        b"buyAndUseToken" => {
-            let (resource_id, n, buyer_account, payer, token_template_bytes) =
-                source.read().unwrap();
-            sink.write(buy_use_token(
-                resource_id,
-                n,
-                buyer_account,
-                payer,
-                token_template_bytes,
-            ));
-        }
         b"getTokenTemplates" => {
             let resource_id = source.read().unwrap();
             sink.write(get_token_templates(resource_id));
-        }
-        b"useToken" => {
-            let (resource_id, account, token_template, n) = source.read().unwrap();
-            sink.write(use_token(resource_id, account, token_template, n));
-        }
-        b"useTokenByAgent" => {
-            let (resource_id, account, agent, token_template, n) = source.read().unwrap();
-            sink.write(use_token_by_agent(
-                resource_id,
-                account,
-                agent,
-                token_template,
-                n,
-            ));
-        }
-        b"setAgents" => {
-            let (resource_id, account, agents, n) = source.read().unwrap();
-            sink.write(set_agents(resource_id, account, agents, n));
-        }
-        b"setTokenAgents" => {
-            let (resource_id, account, agents, template_bytes, n) = source.read().unwrap();
-            sink.write(set_token_agents(
-                resource_id,
-                account,
-                agents,
-                template_bytes,
-                n,
-            ));
-        }
-        b"addAgents" => {
-            let (resource_id, account, agents, n) = source.read().unwrap();
-            sink.write(add_agents(resource_id, account, agents, n));
-        }
-        b"addTokenAgents" => {
-            let (resource_id, account, token_template_bytes, agents, n) = source.read().unwrap();
-            sink.write(add_token_agents(
-                resource_id,
-                account,
-                token_template_bytes,
-                agents,
-                n,
-            ));
-        }
-        b"removeAgents" => {
-            let (resource_id, account, agents) = source.read().unwrap();
-            sink.write(remove_agents(resource_id, account, agents));
-        }
-        b"removeTokenAgents" => {
-            let (resource_id, template_bytes, account, agents) = source.read().unwrap();
-            sink.write(remove_token_agents(
-                resource_id,
-                template_bytes,
-                account,
-                agents,
-            ));
         }
         _ => {
             let method = str::from_utf8(action).ok().unwrap();
