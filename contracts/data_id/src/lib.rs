@@ -21,7 +21,6 @@ pub struct OntIdIndex {
 #[derive(Encoder, Decoder)]
 pub struct DataIdInfo {
     data_id: Vec<u8>,        //used to uniquely mark a piece of data
-    data_type: RT,           // data type, contains static data type and other type.
     data_meta_hash: H256, //data meta is meta information of data, data meta hash is the sha256 of data meta
     data_hash: H256,      //data hash is sha256 of data
     owners: Vec<OntIdIndex>, // data owner
@@ -31,7 +30,6 @@ impl DataIdInfo {
     fn default() -> Self {
         DataIdInfo {
             data_id: vec![0u8],
-            data_type: RT::Other,
             data_meta_hash: H256::new([0u8; 32]),
             data_hash: H256::new([0u8; 32]),
             owners: vec![],

@@ -1,11 +1,12 @@
 [workspace]
 members = [
     "common",
-    "contracts/ddxf",
-    "contracts/dtoken",
     "contracts/marketplace",
+    "contracts/dtoken",
     "contracts/split_policy",
-    "contracts/data_id"
+    "contracts/data_id",
+    "contracts/accountant",
+    "contracts/openkg"
 ]
 
 [profile.release]
