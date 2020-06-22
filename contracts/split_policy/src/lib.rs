@@ -21,7 +21,7 @@ const TOTAL: U128 = 10000;
 #[derive(Encoder, Decoder, Clone)]
 pub struct AddrAmt {
     to: Address,
-    percent: u32,
+    weight: u32,
     has_withdraw: bool,
 }
 
