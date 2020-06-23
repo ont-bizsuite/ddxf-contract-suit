@@ -26,7 +26,7 @@ const ADMIN: Address = ostd::macros::base58!("Aejfo7ZX5PVpenRj23yChnyH64nf8T1zbu
 /// set marketplace contract address, need admin signature
 ///
 /// only marketplace contract has the right to invoke some method
-fn set_ddxf_contract(new_addr: &Address) -> bool {
+fn set_mp_contract(new_addr: &Address) -> bool {
     let admin = get_admin();
     assert!(check_witness(&admin));
     database::put(KEY_DDXF_CONTRACT, new_addr);
@@ -34,7 +34,7 @@ fn set_ddxf_contract(new_addr: &Address) -> bool {
 }
 
 /// query marketplace contract address
-fn get_ddxf_contract() -> Address {
+fn get_mp_contract() -> Address {
     database::get(KEY_DDXF_CONTRACT).unwrap()
 }
 
@@ -133,7 +133,7 @@ pub fn use_token_by_agent(
     token_template_bytes: &[u8],
     n: U128,
 ) -> bool {
-    assert!(check_witness(account));
+    assert!(check_witness(agent));
     let mut caa = get_count_and_agent(account, token_template_bytes);
     assert!(caa.count >= n as u32);
     let agent_count = caa.agents.get_mut(agent).unwrap();
@@ -365,7 +365,7 @@ fn migrate(
 
 fn check_caller() {
     let caller = runtime::caller();
-    let ddxf = get_ddxf_contract();
+    let ddxf = get_mp_contract();
     assert!(caller == ddxf);
 }
 
@@ -395,10 +395,10 @@ pub fn invoke() {
         }
         b"setDdxfContract" => {
             let new_addr = source.read().unwrap();
-            sink.write(set_ddxf_contract(new_addr));
+            sink.write(set_mp_contract(new_addr));
         }
         b"getDdxfContract" => {
-            sink.write(get_ddxf_contract());
+            sink.write(get_mp_contract());
         }
         b"migrate" => {
             let (code, vm_type, name, version, author, email, desc) = source.read().unwrap();

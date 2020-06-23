@@ -39,9 +39,10 @@ const KEY_ADMIN: &[u8] = b"05";
 //AbtTQJYKfQxq4UdygDsbLVjE8uRrJ2H3tP
 //AYnhakv7kC9R5ppw65JoE2rt6xDzCjCTvD
 const ADMIN: Address = ostd::macros::base58!("Aejfo7ZX5PVpenRj23yChnyH64nf8T1zbu");
-const DEFAULT_SPLIT_CONTRACT: Address = ostd::macros::base58!("ANNA5KBoRaY2PbKuHYZJCedZ6NkpJN2tYh");
+
+const DEFAULT_SPLIT_CONTRACT: Address = ostd::macros::base58!("AMXuQUmH2Q3a5nC75rwJH4wXEpPFYaGZDk");
 const DEFAULT_DTOKEN_CONTRACT: Address =
-    ostd::macros::base58!("AR91qGoLrLqhb1CJ5MztpwfpdDveAEDJU5");
+    ostd::macros::base58!("Abg8YjpumVAcodjtMqF7RjhNyTZJ2AwBp1");
 
 /// set dtoken contract address as the default dtoken contract address,
 /// marketplace contract will invoke dtoken contract to pay the fee
@@ -194,10 +195,6 @@ pub fn dtoken_seller_publish_inner(
     }
 
     //event
-    let mut sink = Sink::new(16);
-    sink.write(resource_ddo);
-    let mut sink2 = Sink::new(16);
-    sink2.write(item);
     let mut method = "dtokenSellerPublish";
     if !is_publish {
         method = "update"
@@ -205,8 +202,8 @@ pub fn dtoken_seller_publish_inner(
     EventBuilder::new()
         .string(method)
         .bytearray(resource_id)
-        .bytearray(sink.bytes())
-        .bytearray(sink2.bytes())
+        .bytearray(resource_ddo_bytes)
+        .bytearray(item_bytes)
         .notify();
     true
 }
@@ -232,22 +229,8 @@ fn delete(resource_id: &[u8]) -> bool {
             .unwrap();
     assert!(check_witness(&item_info.resource_ddo.manager));
     database::delete(utils::generate_seller_item_info_key(resource_id));
-    true
-}
-
-fn freeze(resource_id: &[u8]) -> bool {
-    let mut item_info =
-        database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
-            .unwrap();
-    assert!(check_witness(&item_info.resource_ddo.manager));
-    item_info.resource_ddo.is_freeze = true;
-    if item_info.item.sold == 0 {
-        database::delete(utils::generate_seller_item_info_key(resource_id));
-    } else {
-        database::put(utils::generate_seller_item_info_key(resource_id), item_info);
-    }
     EventBuilder::new()
-        .string("freeze")
+        .string("delete")
         .bytearray(resource_id)
         .notify();
     true
@@ -375,7 +358,6 @@ pub fn buy_dtoken(resource_id: &[u8], n: U128, buyer_account: &Address, payer: &
     let mut item_info =
         database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
             .unwrap();
-    assert!(item_info.resource_ddo.is_freeze == false);
     let now = runtime::timestamp();
     assert!(now < item_info.item.expired_date);
 
@@ -452,7 +434,6 @@ pub fn buy_dtoken_reward(
     let mut item_info =
         database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
             .unwrap();
-    assert!(item_info.resource_ddo.is_freeze == false);
     assert!(item_info.item.fee.count == 0);
     let now = runtime::timestamp();
     assert!(now < item_info.item.expired_date);
@@ -637,10 +618,6 @@ pub fn invoke() {
         b"getSellerItemInfo" => {
             let resource_id = source.read().unwrap();
             sink.write(get_seller_item_info(resource_id))
-        }
-        b"freeze" => {
-            let resource_id = source.read().unwrap();
-            sink.write(freeze(resource_id));
         }
         b"buyDtokenFromReseller" => {
             let (resource_id, n, buyer_account, reseller_account) = source.read().unwrap();

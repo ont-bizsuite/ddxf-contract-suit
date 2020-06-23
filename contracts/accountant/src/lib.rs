@@ -184,7 +184,7 @@ pub fn invoke() {
             let (seller_acc, fee_split_model) = source.read().unwrap();
             sink.write(set_fee_split_model(seller_acc, fee_split_model));
         }
-        b"get_fee_split_model" => {
+        b"getFeeSplitModel" => {
             let seller_acc = source.read().unwrap();
             sink.write(get_fee_split_model(seller_acc));
         }
@@ -198,7 +198,7 @@ pub fn invoke() {
                 n,
             ));
         }
-        b"balance_of" => {
+        b"balanceOf" => {
             let order_id_bytes = source.read().unwrap();
             sink.write(get_settle_info(order_id_bytes));
         }
