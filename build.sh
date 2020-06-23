@@ -1,4 +1,4 @@
-cd ./contracts/split_policy
+cd ./contracts/dtoken
 
 cargo build --release --target=wasm32-unknown-unknown
 

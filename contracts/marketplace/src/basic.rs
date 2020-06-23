@@ -10,7 +10,6 @@ pub struct ResourceDDO {
     pub dtoken_contract_address: Option<Vec<Address>>, // can be empty
     pub mp_contract_address: Option<Address>,          // can be empty
     pub split_policy_contract_address: Option<Address>, //can be empty
-    pub is_freeze: bool,
 }
 
 impl ResourceDDO {
