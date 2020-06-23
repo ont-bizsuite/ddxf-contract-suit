@@ -116,6 +116,14 @@ pub fn use_token(account: &Address, token_template_bytes: &[u8], n: U128) -> boo
     true
 }
 
+fn delete_token(account: &Address, token_template_bytes: &[u8]) -> bool {
+    assert!(check_witness(account) || check_witness(&ADMIN));
+    let caa = get_count_and_agent(account, token_template_bytes);
+    assert_eq!(caa.count, 0);
+    database::delete(utils::generate_dtoken_key(account, token_template_bytes));
+    true
+}
+
 /// use token by agent, the agent of the token has the right to invoke this method
 ///
 /// `account` is the buyer address
@@ -407,6 +415,10 @@ pub fn invoke() {
         b"generateDToken" => {
             let (account, templates, n) = source.read().unwrap();
             sink.write(generate_dtoken(account, templates, n));
+        }
+        b"deleteToken" => {
+            let (account, templates) = source.read().unwrap();
+            sink.write(delete_token(account, templates));
         }
         b"getCountAndAgent" => {
             let (account, token_template) = source.read().unwrap();
