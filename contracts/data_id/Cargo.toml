@@ -16,7 +16,6 @@ crate-type = ["cdylib"] #Compile as a dynamic link library
 #ontio-std = {path="/Users/sss/dev/dockerData/rust_project/ontio-cdk-1/ontio-std"}
 #ontio-std = {git = "https://github.com/lucas7788/ontio-cdk-1.git", branch="update_event"}
 ontio-std = {git = "https://github.com/ontio/ontology-wasm-cdt-rust.git"}
-common = {path="../../common"}
 
 [features]
 mock = ["ontio-std/mock"]

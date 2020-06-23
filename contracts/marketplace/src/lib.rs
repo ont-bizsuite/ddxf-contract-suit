@@ -1,220 +1,722 @@
+//! marketplace contract
+//!
+//! Seller publishing process
+//!
+//! seller only need invoke [`dtoken_seller_publish`](fn.dtoken_seller_publish.html) method to publish products
+//!
+//! Buyer purchase and use process
+//!
+//! first of all, buyers should invoke [`buy_dtoken`](fn.buy_dtoken.html) method to buy the released products
+//!
+//! Second, buyer invoke the [`use_token`](fn.use_token.html) method to consume token
+
 #![cfg_attr(not(feature = "mock"), no_std)]
 #![feature(proc_macro_hygiene)]
 extern crate alloc;
+extern crate common;
 extern crate ontio_std as ostd;
-use ostd::abi::{Decoder, Encoder, Error, Sink, Source};
+use ostd::abi::{EventBuilder, Sink, Source};
 use ostd::database;
 use ostd::prelude::*;
-use ostd::runtime::{address, check_witness, input, ret};
+use ostd::runtime;
 use ostd::types::{Address, U128};
-mod utils;
-use ostd::contract::{ong, ont, wasm};
-use utils::*;
 mod basic;
 use basic::*;
-extern crate common;
-use common::{Fee, OrderId, TokenType};
+mod dtoken;
+use common::*;
+use dtoken::*;
+use ostd::contract::wasm;
+use ostd::runtime::{check_witness, contract_migrate, current_txhash};
+
 #[cfg(test)]
 mod test;
 
-const MAX_PERCENTAGE: U128 = 10000;
-const ADMIN: Address = ostd::macros::base58!("AbtTQJYKfQxq4UdygDsbLVjE8uRrJ2H3tP");
+const KEY_SELLER_ITEM_INFO: &[u8] = b"01";
+const KEY_DTOKEN_CONTRACT: &[u8] = b"03";
+const KEY_SPLIT_POLICY_CONTRACT: &[u8] = b"04";
+const KEY_ADMIN: &[u8] = b"05";
 
-fn set_mp(mp_account: &Address) -> bool {
+//AbtTQJYKfQxq4UdygDsbLVjE8uRrJ2H3tP
+//AYnhakv7kC9R5ppw65JoE2rt6xDzCjCTvD
+const ADMIN: Address = ostd::macros::base58!("Aejfo7ZX5PVpenRj23yChnyH64nf8T1zbu");
+const DEFAULT_SPLIT_CONTRACT: Address = ostd::macros::base58!("ANNA5KBoRaY2PbKuHYZJCedZ6NkpJN2tYh");
+const DEFAULT_DTOKEN_CONTRACT: Address =
+    ostd::macros::base58!("AR91qGoLrLqhb1CJ5MztpwfpdDveAEDJU5");
+
+/// set dtoken contract address as the default dtoken contract address,
+/// marketplace contract will invoke dtoken contract to pay the fee
+/// need admin signature
+/// `new_addr` is the new dtoken contract address
+pub fn set_dtoken_contract(new_addr: &Address) -> bool {
     assert!(check_witness(&ADMIN));
-    database::put(utils::KEY_MP, mp_account);
+    database::put(KEY_DTOKEN_CONTRACT, new_addr);
     true
 }
-/// set charging model, need mp and seller signature
+
+/// init contract
+/// set dtoken and split contract address
+pub fn init(dtoken: Address, split_policy: Address) -> bool {
+    assert!(check_witness(&ADMIN));
+    database::put(KEY_DTOKEN_CONTRACT, dtoken);
+    database::put(KEY_SPLIT_POLICY_CONTRACT, split_policy);
+    true
+}
+
+/// query the default dtoken contract address
+pub fn get_dtoken_contract() -> Address {
+    database::get::<_, Address>(KEY_DTOKEN_CONTRACT).unwrap_or(DEFAULT_DTOKEN_CONTRACT)
+}
+
+/// set split contract address as the default split contract address,
 ///
-/// `seller_acc` is seller address
+/// When there are multiple data owners, split contract is used to set the income distribution strategy.
 ///
-/// `fee_split_model` is the charging model that is agreed by the seller and MP
-fn set_fee_split_model(seller_acc: &Address, fee_split_model: FeeSplitModel) -> bool {
-    assert!(fee_split_model.percentage <= MAX_PERCENTAGE as u16);
-    let mp = get_mp_account();
-    assert!(check_witness(seller_acc) && check_witness(&mp));
-    let mp = database::get::<_, Address>(KEY_MP).unwrap();
-    assert!(check_witness(&mp) && check_witness(&seller_acc));
-    database::put(
-        utils::generate_fee_split_model_key(seller_acc),
-        fee_split_model,
+/// need admin signature
+pub fn set_split_policy_contract(new_addr: &Address) -> bool {
+    assert!(check_witness(&ADMIN));
+    database::put(KEY_SPLIT_POLICY_CONTRACT, new_addr);
+    true
+}
+
+/// query the default split contract address
+fn get_split_policy_contract() -> Address {
+    database::get::<_, Address>(KEY_SPLIT_POLICY_CONTRACT).unwrap_or(DEFAULT_SPLIT_CONTRACT)
+}
+
+/// need old admin signature
+///
+/// update the admin address, admin has the right to set the default dtoken and split contract address
+fn update_admin(new_admin: &Address) -> bool {
+    let old_admin = get_admin();
+    assert!(check_witness(&old_admin));
+    database::put(KEY_ADMIN, new_admin);
+    true
+}
+
+/// query admin address
+fn get_admin() -> Address {
+    database::get::<_, Address>(KEY_ADMIN).unwrap_or(ADMIN)
+}
+
+/// seller publish product, need seller signature
+///
+/// `resource_id` used to mark the only commodity in the chain
+///
+/// `resource_ddo_bytes` is the result of ResourceDDO struct serialization
+///
+/// `item_bytes` is the result of DTokenItem struct serialization
+///
+/// `split_policy_param_bytes` is the result of RegisterParam struct serialization
+///
+/// # Example
+/// ```no_run
+/// use common::{Fee,TokenType};
+/// let resource_id = b"resource_id";
+/// let ddo = ResourceDDO {
+///        token_resource_ty_endpoints: vec![],
+///        item_meta_hash: H256::repeat_byte(1),
+///        manager: manager.clone(),
+///        dtoken_contract_address: Some(dtoken_contract_address.clone()),
+///        mp_contract_address: None,
+///        split_policy_contract_address: None,
+///    };
+/// let contract_addr = Address::repeat_byte(4);
+///    let fee = Fee {
+///        contract_addr,
+///        contract_type: TokenType::ONG,
+///        count: 0,
+///    };
+///    let mut templates = vec![];
+///    templates.push(token_template.clone());
+///    let dtoken_item = DTokenItem {
+///        fee,
+///        expired_date: 1,
+///        stocks: 1,
+///        templates,
+///    };
+///  let split_param = b"test";
+///  assert!(supper::dtoken_seller_publish(
+///        resource_id,
+///        &ddo.to_bytes(),
+///        &dtoken_item.to_bytes(),
+///        split_param
+///    ));
+/// ```
+pub fn dtoken_seller_publish(
+    resource_id: &[u8],
+    resource_ddo_bytes: &[u8],
+    item_bytes: &[u8],
+    split_policy_param_bytes: &[u8],
+) -> bool {
+    dtoken_seller_publish_inner(
+        resource_id,
+        resource_ddo_bytes,
+        item_bytes,
+        split_policy_param_bytes,
+        true,
+    )
+}
+
+pub fn dtoken_seller_publish_inner(
+    resource_id: &[u8],
+    resource_ddo_bytes: &[u8],
+    item_bytes: &[u8],
+    split_policy_param_bytes: &[u8],
+    is_publish: bool,
+) -> bool {
+    let resource_ddo = ResourceDDO::from_bytes(resource_ddo_bytes);
+    let item = DTokenItem::from_bytes(item_bytes);
+    assert!(runtime::check_witness(&resource_ddo.manager));
+    let resource =
+        database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id));
+    if is_publish {
+        assert!(resource.is_none());
+    }
+    assert_ne!(item.token_templates.len(), 0);
+
+    let seller = SellerItemInfo::new(item.clone(), resource_ddo.clone());
+    database::put(utils::generate_seller_item_info_key(resource_id), seller);
+
+    //invoke split_policy contract
+    let split_addr = get_split_policy_contract();
+    let res = wasm::call_contract(
+        &resource_ddo
+            .split_policy_contract_address
+            .unwrap_or(split_addr),
+        ("register", (resource_id, split_policy_param_bytes)),
     );
+    if let Some(r) = res {
+        let mut source = Source::new(r.as_slice());
+        let rr: bool = source.read().unwrap();
+        assert!(rr);
+    } else {
+        panic!("call split contract register failed");
+    }
+
+    //event
+    let mut sink = Sink::new(16);
+    sink.write(resource_ddo);
+    let mut sink2 = Sink::new(16);
+    sink2.write(item);
+    let mut method = "dtokenSellerPublish";
+    if !is_publish {
+        method = "update"
+    }
+    EventBuilder::new()
+        .string(method)
+        .bytearray(resource_id)
+        .bytearray(sink.bytes())
+        .bytearray(sink2.bytes())
+        .notify();
     true
 }
 
-/// query seller's charging model by seller's address
-fn get_fee_split_model(seller_acc: &Address) -> FeeSplitModel {
-    database::get::<_, FeeSplitModel>(utils::generate_fee_split_model_key(seller_acc))
-        .unwrap_or(FeeSplitModel { percentage: 0 })
+fn update(
+    resource_id: &[u8],
+    resource_ddo_bytes: &[u8],
+    item_bytes: &[u8],
+    split_policy_param_bytes: &[u8],
+) -> bool {
+    dtoken_seller_publish_inner(
+        resource_id,
+        resource_ddo_bytes,
+        item_bytes,
+        split_policy_param_bytes,
+        false,
+    )
 }
 
-/// transfer fee to the contract and register the income distribution balance of this order
+fn delete(resource_id: &[u8]) -> bool {
+    let item_info =
+        database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
+            .unwrap();
+    assert!(check_witness(&item_info.resource_ddo.manager));
+    database::delete(utils::generate_seller_item_info_key(resource_id));
+    true
+}
+
+fn freeze(resource_id: &[u8]) -> bool {
+    let mut item_info =
+        database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
+            .unwrap();
+    assert!(check_witness(&item_info.resource_ddo.manager));
+    item_info.resource_ddo.is_freeze = true;
+    if item_info.item.sold == 0 {
+        database::delete(utils::generate_seller_item_info_key(resource_id));
+    } else {
+        database::put(utils::generate_seller_item_info_key(resource_id), item_info);
+    }
+    EventBuilder::new()
+        .string("freeze")
+        .bytearray(resource_id)
+        .notify();
+    true
+}
+
+pub fn get_seller_item_info(resource_id: &[u8]) -> Vec<u8> {
+    let r = runtime::storage_read(utils::generate_seller_item_info_key(resource_id).as_slice())
+        .map(|val: Vec<u8>| val);
+    if let Some(rr) = r {
+        rr
+    } else {
+        vec![]
+    }
+}
+
+/// buy dtoken from reseller
 ///
-/// `order_id_bytes` is the serialization result of OrderId
+/// The seller can sell what he bought before he used it
 ///
-/// `buyer_acc` is buyer address
+/// `resource_id` used to mark the only commodity in the chain
 ///
-/// `split_contract_address` is split contract address which register the distribution strategy
+/// `n` is the number of purchases
 ///
-/// `fee` is the cost of one share
+/// `buyer_account` is buyer address, need this address signature
 ///
-/// `n` is the number of shares purchased
-fn transfer_amount(
-    order_id_bytes: &[u8],
-    buyer_acc: &Address,
+/// `reseller_account` is reseller address, need this address signature
+pub fn buy_dtoken_from_reseller(
+    resource_id: &[u8],
+    n: U128,
+    buyer_account: &Address,
+    reseller_account: &Address,
+) -> bool {
+    assert!(runtime::check_witness(buyer_account) && runtime::check_witness(reseller_account));
+    let item_info =
+        database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
+            .unwrap();
+    let oi = OrderId {
+        item_id: resource_id.to_vec(),
+        tx_hash: current_txhash(),
+    };
+    let split_contract = get_split_policy_contract();
+    assert!(transfer_fee(
+        &oi,
+        buyer_account,
+        item_info.resource_ddo.mp_contract_address,
+        &item_info
+            .resource_ddo
+            .split_policy_contract_address
+            .unwrap_or(split_contract),
+        item_info.item.fee.clone(),
+        n
+    ));
+    if let Some(d) = item_info.resource_ddo.dtoken_contract_address {
+        let l = d.len();
+        for i in 0..l {
+            let mut sink = Sink::new(64);
+            sink.write(vec![item_info.item.token_templates.get(i)]);
+            assert!(transfer_dtoken(
+                d.get(i).unwrap(),
+                reseller_account,
+                buyer_account,
+                resource_id,
+                sink.bytes(),
+                n
+            ));
+        }
+    } else {
+        let dtoken = get_dtoken_contract();
+        assert!(transfer_dtoken(
+            &dtoken,
+            reseller_account,
+            buyer_account,
+            resource_id,
+            &item_info.item.get_templates_bytes(),
+            n
+        ));
+    }
+    EventBuilder::new()
+        .string("buyDtokenFromReseller")
+        .bytearray(resource_id)
+        .number(n)
+        .address(buyer_account)
+        .address(reseller_account)
+        .notify();
+    true
+}
+
+/// Buy more than one dtoken at a time
+///
+/// `resource_ids` is array of resource_id which used to mark the only commodity in the chain
+///
+/// `ns` is array of n which is the number of purchases. the length of resource_ids must be the same with the length of ns.
+///
+/// `buyer_account` is buyer address, need this address signature
+pub fn buy_dtokens(
+    resource_ids: Vec<&[u8]>,
+    ns: Vec<U128>,
+    buyer_account: &Address,
+    payer: &Address,
+) -> bool {
+    let l = resource_ids.len();
+    assert_eq!(l, ns.len());
+    for i in 0..l {
+        assert!(buy_dtoken(resource_ids[i], ns[i], buyer_account, payer));
+    }
+    true
+}
+
+fn get_token_templates(resource_id: &[u8]) -> Vec<TokenTemplate> {
+    let item_info =
+        database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
+            .unwrap();
+    return item_info.item.token_templates;
+}
+
+/// buy dtoken
+///
+/// `resource_id` used to mark the only commodity in the chain
+///
+/// `n` is the number of purchases
+///
+/// `buyer_account` is buyer address, need this address signature
+pub fn buy_dtoken(resource_id: &[u8], n: U128, buyer_account: &Address, payer: &Address) -> bool {
+    assert!(runtime::check_witness(buyer_account) && runtime::check_witness(payer));
+    let mut item_info =
+        database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
+            .unwrap();
+    assert!(item_info.resource_ddo.is_freeze == false);
+    let now = runtime::timestamp();
+    assert!(now < item_info.item.expired_date);
+
+    assert!(item_info.item.sold < item_info.item.stocks);
+    item_info.item.sold = n.checked_add(item_info.item.sold as U128).unwrap() as u32;
+    assert!(item_info.item.sold <= item_info.item.stocks);
+    let oi = OrderId {
+        item_id: resource_id.to_vec(),
+        tx_hash: current_txhash(),
+    };
+    assert!(transfer_fee(
+        &oi,
+        payer,
+        item_info.resource_ddo.mp_contract_address.clone(),
+        &item_info
+            .resource_ddo
+            .split_policy_contract_address
+            .unwrap_or(get_split_policy_contract()),
+        item_info.item.fee.clone(),
+        n
+    ));
+    database::put(
+        utils::generate_seller_item_info_key(resource_id),
+        &item_info,
+    );
+    if let Some(dtoken_addr) = item_info.resource_ddo.dtoken_contract_address {
+        let l = dtoken_addr.len();
+        for i in 0..l {
+            let mut sink = Sink::new(64);
+            sink.write(vec![item_info.item.token_templates.get(i)]);
+            assert!(generate_dtoken(
+                &dtoken_addr[i],
+                buyer_account,
+                sink.bytes(),
+                n
+            ));
+        }
+    } else {
+        let dtoken = get_dtoken_contract();
+        assert!(generate_dtoken(
+            &dtoken,
+            buyer_account,
+            &item_info.item.get_templates_bytes(),
+            n
+        ));
+    }
+    EventBuilder::new()
+        .string("buyDtoken")
+        .bytearray(resource_id)
+        .number(n)
+        .address(buyer_account)
+        .address(payer)
+        .notify();
+    true
+}
+
+/// buy_dtoken_reward
+///
+/// `resource_id` used to mark the only commodity in the chain
+///
+/// `n` is the number of purchases
+///
+/// `buyer_account` is buyer address, need this address signature
+/// `payer` is the address who pay the fee
+/// `unit_price` unit price the buyer is willing to pay
+pub fn buy_dtoken_reward(
+    resource_id: &[u8],
+    n: U128,
+    buyer_account: &Address,
+    payer: &Address,
+    unit_price: U128,
+) -> bool {
+    assert!(runtime::check_witness(buyer_account) && runtime::check_witness(payer));
+    let mut item_info =
+        database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
+            .unwrap();
+    assert!(item_info.resource_ddo.is_freeze == false);
+    assert!(item_info.item.fee.count == 0);
+    let now = runtime::timestamp();
+    assert!(now < item_info.item.expired_date);
+
+    assert!(item_info.item.sold < item_info.item.stocks);
+    item_info.item.sold = n.checked_add(item_info.item.sold as U128).unwrap() as u32;
+    assert!(item_info.item.sold <= item_info.item.stocks);
+    let oi = OrderId {
+        item_id: resource_id.to_vec(),
+        tx_hash: current_txhash(),
+    };
+    let mut fee = item_info.item.fee.clone();
+    fee.count = unit_price as u64;
+    assert!(transfer_fee(
+        &oi,
+        payer,
+        item_info.resource_ddo.mp_contract_address.clone(),
+        &item_info
+            .resource_ddo
+            .split_policy_contract_address
+            .unwrap_or(get_split_policy_contract()),
+        fee,
+        n
+    ));
+    database::put(
+        utils::generate_seller_item_info_key(resource_id),
+        &item_info,
+    );
+    if let Some(dtoken_addr) = item_info.resource_ddo.dtoken_contract_address {
+        let l = dtoken_addr.len();
+        for i in 0..l {
+            let mut sink = Sink::new(64);
+            sink.write(vec![item_info.item.token_templates.get(i)]);
+            assert!(generate_dtoken(
+                &dtoken_addr[i],
+                buyer_account,
+                sink.bytes(),
+                n
+            ));
+        }
+    } else {
+        let dtoken = get_dtoken_contract();
+        assert!(generate_dtoken(
+            &dtoken,
+            buyer_account,
+            &item_info.item.get_templates_bytes(),
+            n
+        ));
+    }
+    EventBuilder::new()
+        .string("buyDtoken")
+        .bytearray(resource_id)
+        .number(n)
+        .address(buyer_account)
+        .address(payer)
+        .notify();
+    true
+}
+
+/// upgrade contract
+fn migrate(
+    code: &[u8],
+    vm_type: u32,
+    name: &str,
+    version: &str,
+    author: &str,
+    email: &str,
+    desc: &str,
+) -> bool {
+    let admin = get_admin();
+    assert!(check_witness(&admin));
+    let new_addr = contract_migrate(code, vm_type, name, version, author, email, desc);
+    let empty_addr = Address::new([0u8; 20]);
+    assert_ne!(new_addr, empty_addr);
+    EventBuilder::new()
+        .string("migrate")
+        .address(&new_addr)
+        .notify();
+    true
+}
+
+// inner method
+fn transfer_fee(
+    oi: &OrderId,
+    buyer_account: &Address,
+    mp_contract_address: Option<Address>,
     split_contract_address: &Address,
     fee: Fee,
     n: U128,
 ) -> bool {
-    assert!(check_witness(buyer_acc));
-    let amt = n.checked_mul(fee.count as U128).unwrap();
-    let self_addr = address();
-    assert!(transfer(
-        buyer_acc,
-        &self_addr,
-        amt,
-        &fee.contract_type,
-        Some(fee.contract_addr.clone()),
-    ));
-
-    //store information that split_contract needs
-    let info = SettleInfo {
-        split_contract_addr: split_contract_address.clone(),
-        fee,
-        n,
+    let res = match mp_contract_address {
+        Some(mp_addr) => wasm::call_contract(
+            &mp_addr,
+            (
+                "transferAmount",
+                (oi.to_bytes(), buyer_account, split_contract_address, fee, n),
+            ),
+        ),
+        _ => {
+            let amt = n.checked_mul(fee.count as U128).unwrap();
+            wasm::call_contract(
+                split_contract_address,
+                (
+                    "transferWithdraw",
+                    (buyer_account, oi.item_id.as_slice(), amt),
+                ),
+            )
+        }
     };
-    database::put(utils::generate_balance_key(order_id_bytes), info);
+    verify_result(res);
     true
 }
 
-/// query settle info by order id
-fn get_settle_info(order_id: &[u8]) -> SettleInfo {
-    database::get::<_, SettleInfo>(utils::generate_balance_key(order_id))
-        .unwrap_or(SettleInfo::default())
-}
-
-/// expense settlement, first transfer fee to mp, second invoke "transferWithdraw" method of split contract
-///
-/// `seller_acc` is the seller address, need the address signature
-///
-/// `order_id` is the serialization result of OrderId
-fn settle(seller_acc: &Address, order_id: &[u8]) -> bool {
-    assert!(check_witness(seller_acc));
-    let self_addr = address();
-    let mp = get_mp_account();
-    let info = get_settle_info(order_id);
-
-    //1. mp
-    let fee_split = get_fee_split_model(seller_acc);
-    let fee = info.fee;
-    let total = info.n.checked_mul(fee.count as U128).unwrap();
-    let mp_fee = total.checked_mul(fee_split.percentage as U128).unwrap();
-    let mp_amt = mp_fee.checked_div(MAX_PERCENTAGE).unwrap();
-    if mp_amt != 0 {
-        assert!(transfer(
-            &self_addr,
-            &mp,
-            mp_amt,
-            &fee.contract_type,
-            Some(fee.contract_addr)
-        ));
-    }
-    //2.split
-    let seller_amt = total.checked_sub(mp_amt).unwrap();
-    let oi = OrderId::from_bytes(order_id);
-    let res = wasm::call_contract(
-        &info.split_contract_addr,
-        ("transferWithdraw", (&self_addr, oi.item_id, seller_amt)),
-    );
-    if let Some(rr) = res {
-        let mut source = Source::new(rr.as_slice());
+fn verify_result(res: Option<Vec<u8>>) {
+    if let Some(r) = res {
+        let mut source = Source::new(r.as_slice());
         let r: bool = source.read().unwrap();
         assert!(r);
     } else {
-        panic!("call split contract failed")
+        panic!("call contract failed")
     }
-    database::delete(utils::generate_balance_key(order_id));
-    true
-}
-
-fn transfer(
-    from: &Address,
-    to: &Address,
-    amt: U128,
-    contract_type: &TokenType,
-    contract_addr: Option<Address>,
-) -> bool {
-    match contract_type {
-        TokenType::ONG => {
-            assert!(ong::transfer(from, to, amt));
-        }
-        TokenType::ONT => {
-            assert!(ont::transfer(from, to, amt));
-        }
-        TokenType::OEP4 => {
-            //TODO
-            let contract_address = contract_addr.unwrap();
-            let res =
-                wasm::call_contract(&contract_address, ("transfer", (from, to, amt))).unwrap();
-            let mut source = Source::new(&res);
-            let b: bool = source.read().unwrap();
-            assert!(b);
-        }
-    }
-    true
-}
-
-fn get_mp_account() -> Address {
-    database::get::<_, Address>(utils::KEY_MP).unwrap()
 }
 
 #[no_mangle]
 pub fn invoke() {
-    let input = input();
+    let input = runtime::input();
     let mut source = Source::new(&input);
     let action: &[u8] = source.read().unwrap();
     let mut sink = Sink::new(12);
     match action {
-        b"setFeeSplitModel" => {
-            let (seller_acc, fee_split_model) = source.read().unwrap();
-            sink.write(set_fee_split_model(seller_acc, fee_split_model));
+        b"updateAdmin" => {
+            let new_admin = source.read().unwrap();
+            sink.write(update_admin(&new_admin));
         }
-        b"get_fee_split_model" => {
-            let seller_acc = source.read().unwrap();
-            sink.write(get_fee_split_model(seller_acc));
+        b"getAdmin" => {
+            sink.write(get_admin());
         }
-        b"transferAmount" => {
-            let (order_id_bytes, buyer_acc, seller_acc, fee, n) = source.read().unwrap();
-            sink.write(transfer_amount(
-                order_id_bytes,
-                buyer_acc,
-                seller_acc,
-                fee,
-                n,
+        b"init" => {
+            let (dtoken, split_policy) = source.read().unwrap();
+            sink.write(init(dtoken, split_policy));
+        }
+        b"setSplitPolicyContract" => {
+            let new_addr = source.read().unwrap();
+            sink.write(set_split_policy_contract(new_addr));
+        }
+        b"getSplitPolicyContract" => sink.write(get_split_policy_contract()),
+        b"setDTokenContract" => {
+            let new_addr = source.read().unwrap();
+            sink.write(set_dtoken_contract(&new_addr));
+        }
+        b"getDTokenContract" => {
+            sink.write(get_dtoken_contract());
+        }
+        b"migrate" => {
+            let (code, vm_type, name, version, author, email, desc) = source.read().unwrap();
+            sink.write(migrate(code, vm_type, name, version, author, email, desc));
+        }
+        b"update" => {
+            let (resource_id, resource_ddo, item, split_policy_param_bytes) =
+                source.read().unwrap();
+            sink.write(update(
+                resource_id,
+                resource_ddo,
+                item,
+                split_policy_param_bytes,
             ));
         }
-        b"balance_of" => {
-            let order_id_bytes = source.read().unwrap();
-            sink.write(get_settle_info(order_id_bytes));
+        b"delete" => {
+            let resource_id = source.read().unwrap();
+            sink.write(delete(resource_id));
         }
-        b"settle" => {
-            let (seller_acc, order_id) = source.read().unwrap();
-            sink.write(settle(seller_acc, order_id));
+        b"dtokenSellerPublish" => {
+            let (resource_id, resource_ddo, item, split_policy_param_bytes) =
+                source.read().unwrap();
+            sink.write(dtoken_seller_publish(
+                resource_id,
+                resource_ddo,
+                item,
+                split_policy_param_bytes,
+            ));
         }
-        b"set_mp" => {
-            let mp_addr = source.read().unwrap();
-            sink.write(set_mp(mp_addr));
+        b"getSellerItemInfo" => {
+            let resource_id = source.read().unwrap();
+            sink.write(get_seller_item_info(resource_id))
         }
-        b"get_mp_account" => {
-            sink.write(get_mp_account());
+        b"freeze" => {
+            let resource_id = source.read().unwrap();
+            sink.write(freeze(resource_id));
+        }
+        b"buyDtokenFromReseller" => {
+            let (resource_id, n, buyer_account, reseller_account) = source.read().unwrap();
+            sink.write(buy_dtoken_from_reseller(
+                resource_id,
+                n,
+                buyer_account,
+                reseller_account,
+            ));
+        }
+        b"buyDtokens" => {
+            let (resource_ids, ns, buyer, payer) = source.read().unwrap();
+            sink.write(buy_dtokens(resource_ids, ns, buyer, payer));
+        }
+        b"buyDtoken" => {
+            let (resource_id, n, buyer_account, payer) = source.read().unwrap();
+            sink.write(buy_dtoken(resource_id, n, buyer_account, payer));
+        }
+        b"buyDtokenReward" => {
+            let (resource_id, n, buyer_account, payer, unit_price) = source.read().unwrap();
+            sink.write(buy_dtoken_reward(
+                resource_id,
+                n,
+                buyer_account,
+                payer,
+                unit_price,
+            ));
+        }
+        b"getTokenTemplates" => {
+            let resource_id = source.read().unwrap();
+            sink.write(get_token_templates(resource_id));
         }
         _ => {
             let method = str::from_utf8(action).ok().unwrap();
-            panic!("not support method:{}", method)
+            panic!("marketplace contract, not support method:{}", method)
         }
     }
-    ret(sink.bytes());
+    runtime::ret(sink.bytes());
+}
+
+mod events {
+    use super::*;
+    use ostd::macros::event;
+    #[event(dtokenSellerPublishEvent)]
+    pub fn dtoken_seller_publish_event(resource_id: &[u8], resource_ddo: &[u8], item: &[u8]) {}
+    #[event(buyDtokenFromReseller)]
+    pub fn buy_dtoken_from_reseller(
+        resource_id: &str,
+        n: U128,
+        buyer_account: &Address,
+        reseller_account: &Address,
+    ) {
+    }
+    #[event(buyDtoken)]
+    pub fn buy_dtoken(resource_id: &[u8], n: U128, buyer_account: &Address) {}
+    #[event(useToken)]
+    pub fn use_token(resource_id: &[u8], account: &Address, token_template_bytes: &[u8], n: U128) {}
+    #[event(useTokenByAgent)]
+    pub fn use_token_by_agent(
+        resource_id: &[u8],
+        account: &Address,
+        agent: &Address,
+        token_template_bytes: &[u8],
+        n: U128,
+    ) {
+    }
+    #[event(setDtokenAgents)]
+    pub fn set_agents(resource_id: &[u8], account: &Address, n: U128) {}
+}
+
+mod utils {
+    use super::*;
+    use alloc::vec::Vec;
+    pub fn generate_seller_item_info_key(resource_id: &[u8]) -> Vec<u8> {
+        [KEY_SELLER_ITEM_INFO, resource_id].concat()
+    }
 }
 
 #[cfg(test)]

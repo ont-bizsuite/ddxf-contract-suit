@@ -32,6 +32,7 @@ impl OrderId {
 pub struct TokenTemplate {
     pub data_id: Option<Vec<u8>>,
     pub token_hash: Vec<Vec<u8>>,
+    pub endpoint: Vec<u8>,
 }
 
 impl TokenTemplate {
@@ -48,10 +49,11 @@ impl TokenTemplate {
 }
 
 impl TokenTemplate {
-    pub fn new(data_id: Option<Vec<u8>>, token_hash: Vec<Vec<u8>>) -> Self {
+    pub fn new(data_id: Option<Vec<u8>>, token_hash: Vec<Vec<u8>>, endpoint: Vec<u8>) -> Self {
         TokenTemplate {
             data_id,
             token_hash,
+            endpoint,
         }
     }
 }
@@ -106,36 +108,6 @@ impl<'a> Decoder<'a> for TokenType {
             _ => {
                 panic!("");
             }
-        }
-    }
-}
-
-#[derive(Clone)]
-pub enum RT {
-    Other,
-    RTStaticFile,
-}
-
-impl Encoder for RT {
-    fn encode(&self, sink: &mut Sink) {
-        match self {
-            RT::Other => {
-                sink.write(0u8);
-            }
-            RT::RTStaticFile => {
-                sink.write(1u8);
-            }
-        }
-    }
-}
-
-impl<'a> Decoder<'a> for RT {
-    fn decode(source: &mut Source<'a>) -> Result<Self, Error> {
-        let u = source.read_byte()?;
-        match u {
-            0 => Ok(RT::Other),
-            1 => Ok(RT::RTStaticFile),
-            _ => panic!("not support rt:{}", u),
         }
     }
 }
