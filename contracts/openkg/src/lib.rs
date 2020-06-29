@@ -2,21 +2,42 @@
 #![feature(proc_macro_hygiene)]
 extern crate alloc;
 extern crate ontio_std as ostd;
-use ostd::abi::{Sink, Source};
+use ostd::abi::{EventBuilder, Sink, Source};
 use ostd::contract::wasm;
 use ostd::database;
 use ostd::prelude::*;
 use ostd::runtime;
-use ostd::runtime::check_witness;
+use ostd::runtime::{check_witness, contract_migrate};
 use ostd::types::{Address, U128};
 
 const ADMIN: Address = ostd::macros::base58!("Aejfo7ZX5PVpenRj23yChnyH64nf8T1zbu");
-const MP_CONTRACT_ADDRESS: Address = ostd::macros::base58!("Aejfo7ZX5PVpenRj23yChnyH64nf8T1zbu");
+const MP_CONTRACT_ADDRESS: Address = ostd::macros::base58!("AdD2eNZihgt1QSy6WcxaZrxGUQi6mmx793");
 const DTOKEN_CONTRACT_ADDRESS: Address =
-    ostd::macros::base58!("Aejfo7ZX5PVpenRj23yChnyH64nf8T1zbu");
+    ostd::macros::base58!("AQJzHbcT9pti1zzV2cRZ92B1i1z8QNN2n6");
 
 const KEY_MP_CONTRACT: &[u8] = b"01";
 const KEY_DTOKEN_CONTRACT: &[u8] = b"02";
+
+/// upgrade contract
+fn migrate(
+    code: &[u8],
+    vm_type: u32,
+    name: &str,
+    version: &str,
+    author: &str,
+    email: &str,
+    desc: &str,
+) -> bool {
+    assert!(check_witness(&ADMIN));
+    let new_addr = contract_migrate(code, vm_type, name, version, author, email, desc);
+    let empty_addr = Address::new([0u8; 20]);
+    assert_ne!(new_addr, empty_addr);
+    EventBuilder::new()
+        .string("migrate")
+        .address(&new_addr)
+        .notify();
+    true
+}
 
 fn get_mp_contract_addr() -> Address {
     database::get::<_, Address>(KEY_MP_CONTRACT).unwrap_or(MP_CONTRACT_ADDRESS)
@@ -63,6 +84,32 @@ fn freeze_and_publish(
 }
 
 pub fn buy_use_token(
+    resource_id: &[u8],
+    n: U128,
+    buyer_account: &Address,
+    payer: &Address,
+    token_template_bytes: &[u8],
+) -> bool {
+    //call market place
+    let mp = get_mp_contract_addr();
+    verify_result(wasm::call_contract(
+        &mp,
+        ("buyDtoken", (resource_id, n, buyer_account, payer)),
+    ));
+
+    //call dtoken
+    let dtoken = get_dtoken_contract_addr();
+    verify_result(wasm::call_contract(
+        &dtoken,
+        (
+            "useToken",
+            (resource_id, buyer_account, token_template_bytes, n),
+        ),
+    ));
+    true
+}
+
+pub fn buy_reward_and_use_token(
     resource_id: &[u8],
     n: U128,
     buyer_account: &Address,
@@ -154,11 +201,15 @@ fn invoke() {
     let action: &[u8] = source.read().unwrap();
     let mut sink = Sink::new(12);
     match action {
-        b"set_dtoken_contract_addr" => {
+        b"migrate" => {
+            let (code, vm_type, name, version, author, email, desc) = source.read().unwrap();
+            sink.write(migrate(code, vm_type, name, version, author, email, desc));
+        }
+        b"setDtokenContractAddr" => {
             let dtoken = source.read().unwrap();
             sink.write(set_dtoken_contract_addr(dtoken));
         }
-        b"" => {
+        b"setMpContractAddr" => {
             let mp = source.read().unwrap();
             sink.write(set_mp_contract_addr(mp));
         }

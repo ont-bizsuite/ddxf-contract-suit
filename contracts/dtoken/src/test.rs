@@ -18,7 +18,7 @@ fn generate_dtoken_test() {
     let account = Address::repeat_byte(1);
     let resource_id = b"resource_id";
     let token_hash = vec![0u8, 32];
-    let template = TokenTemplate::new(None, token_hash);
+    let template = TokenTemplate::new(None, vec![token_hash], vec![]);
     let templates = vec![template.clone()];
     let n = 10;
 
@@ -27,71 +27,52 @@ fn generate_dtoken_test() {
 
     let handle = build_runtime();
     handle.witness(&[account.clone()]);
-    assert!(generate_dtoken(&account, resource_id, &templates_bytes, n));
+    assert!(generate_dtoken(&account, resource_id, n));
 
-    let caa = get_count_and_agent(resource_id, &account, &template_bytes);
+    let caa = get_count_and_agent(&account, &template_bytes);
     assert_eq!(caa.count as U128, n);
 
-    assert!(use_token(&account, resource_id, &template_bytes, 1));
+    assert!(use_token(&account, &template_bytes, 1));
 
-    let caa = get_count_and_agent(resource_id, &account, &template_bytes);
+    let caa = get_count_and_agent(&account, &template_bytes);
     assert_eq!(caa.count as U128, n - 1);
 
     let agent = Address::repeat_byte(2);
     let agents: Vec<Address> = vec![agent.clone()];
 
-    assert!(set_agents(
-        &account,
-        resource_id,
-        agents.clone(),
-        n,
-        &templates_bytes
-    ));
+    assert!(set_agents(&account, agents.clone(), n, &templates_bytes));
 
-    let caa = get_count_and_agent(resource_id, &account, &template_bytes);
+    let caa = get_count_and_agent(&account, &template_bytes);
     assert_eq!(caa.agents.len() as U128, 1);
     assert_eq!(caa.agents[&agents.clone()[0]] as U128, n);
 
-    assert!(use_token_by_agent(
-        &account,
-        &agent,
-        resource_id,
-        &template_bytes,
-        1
-    ));
+    assert!(use_token_by_agent(&account, &agent, &template_bytes, 1));
 
-    let caa = get_count_and_agent(resource_id, &account, &template_bytes);
+    let caa = get_count_and_agent(&account, &template_bytes);
     assert_eq!(caa.count as U128, n - 1 - 1);
     assert_eq!(caa.agents.len() as U128, 1);
     assert_eq!(caa.agents[&agents.clone()[0]] as U128, n - 1);
 
     let to_account = Address::repeat_byte(3);
-    assert!(transfer_dtoken(
-        &account,
-        &to_account,
-        resource_id,
-        &templates_bytes,
-        1
-    ));
+    assert!(transfer_dtoken(&account, &to_account, &templates_bytes, 1));
 
-    let caa = get_count_and_agent(resource_id, &account, &template_bytes);
+    let caa = get_count_and_agent(&account, &template_bytes);
     assert_eq!(caa.count as U128, n - 1 - 1 - 1);
     assert_eq!(caa.agents.len() as U128, 1);
     assert_eq!(caa.agents[&agents.clone()[0]] as U128, n - 1);
 
-    let caa = get_count_and_agent(resource_id, &to_account, &template_bytes);
+    let caa = get_count_and_agent(&to_account, &template_bytes);
     assert_eq!(caa.count as U128, 1);
     assert_eq!(caa.agents.len() as U128, 0);
 
     assert!(set_token_agents(
         &account,
-        resource_id,
         &template_bytes,
         agents.clone(),
         1
     ));
 
-    let caa = get_count_and_agent(resource_id, &account, &template_bytes);
+    let caa = get_count_and_agent(&account, &template_bytes);
     assert_eq!(caa.count as U128, n - 1 - 1 - 1);
     assert_eq!(caa.agents.len() as U128, 1);
     assert_eq!(caa.agents[&agents.clone()[0]] as U128, 1);
@@ -99,47 +80,29 @@ fn generate_dtoken_test() {
     let agent2 = Address::repeat_byte(4);
     let agents2: Vec<Address> = vec![agent2.clone()];
 
-    assert!(add_agents(
-        &account,
-        resource_id,
-        agents2.clone(),
-        1,
-        &templates_bytes
-    ));
+    assert!(add_agents(&account, agents2.clone(), 1, &templates_bytes));
 
-    let caa = get_count_and_agent(resource_id, &account, &template_bytes);
+    let caa = get_count_and_agent(&account, &template_bytes);
     assert_eq!(caa.count as U128, n - 1 - 1 - 1);
     assert_eq!(caa.agents.len() as U128, 2);
     assert_eq!(caa.agents[&agents2.clone()[0]] as U128, 1);
 
-    assert!(add_token_agents(
-        &account,
-        resource_id,
-        &template_bytes,
-        agents2.clone(),
-        1
-    ));
+    assert!(add_token_agents(&account, &template_bytes, &agents2, 1));
 
-    let caa = get_count_and_agent(resource_id, &account, &template_bytes);
+    let caa = get_count_and_agent(&account, &template_bytes);
     assert_eq!(caa.count as U128, n - 1 - 1 - 1);
     assert_eq!(caa.agents.len() as U128, 2);
     assert_eq!(caa.agents[&agents2.clone()[0]] as U128, 2);
 
-    assert!(remove_agents(
-        &account,
-        resource_id,
-        agents2.clone(),
-        &templates_bytes
-    ));
+    assert!(remove_agents(&account, agents2.clone(), &templates_bytes));
 
-    let caa = get_count_and_agent(resource_id, &account, &template_bytes);
+    let caa = get_count_and_agent(&account, &template_bytes);
     assert_eq!(caa.count as U128, n - 1 - 1 - 1);
     assert_eq!(caa.agents.len() as U128, 1);
     assert_eq!(caa.agents[&agents.clone()[0]] as U128, 1);
 
     assert!(remove_token_agents(
         &account,
-        resource_id,
         &template_bytes,
         agents2.as_slice()
     ));

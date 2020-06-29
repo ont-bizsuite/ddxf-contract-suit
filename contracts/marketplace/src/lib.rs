@@ -40,9 +40,9 @@ const KEY_ADMIN: &[u8] = b"05";
 //AYnhakv7kC9R5ppw65JoE2rt6xDzCjCTvD
 const ADMIN: Address = ostd::macros::base58!("Aejfo7ZX5PVpenRj23yChnyH64nf8T1zbu");
 
-const DEFAULT_SPLIT_CONTRACT: Address = ostd::macros::base58!("AMXuQUmH2Q3a5nC75rwJH4wXEpPFYaGZDk");
+const DEFAULT_SPLIT_CONTRACT: Address = ostd::macros::base58!("ANzKSQWm7gLvJGrnMok2hoLQAoiLmuC5wq");
 const DEFAULT_DTOKEN_CONTRACT: Address =
-    ostd::macros::base58!("Abg8YjpumVAcodjtMqF7RjhNyTZJ2AwBp1");
+    ostd::macros::base58!("AQJzHbcT9pti1zzV2cRZ92B1i1z8QNN2n6");
 
 /// set dtoken contract address as the default dtoken contract address,
 /// marketplace contract will invoke dtoken contract to pay the fee
