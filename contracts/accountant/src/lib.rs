@@ -6,7 +6,7 @@ use ostd::abi::{Decoder, Encoder, Sink, Source};
 use ostd::contract::{ong, ont, wasm};
 use ostd::database;
 use ostd::prelude::*;
-use ostd::runtime::{address, check_witness, input, ret};
+use ostd::runtime::{address, check_witness, contract_migrate, input, ret};
 use ostd::types::{Address, U128};
 
 mod utils;
@@ -27,6 +27,10 @@ fn set_mp(mp_account: &Address) -> bool {
     assert!(check_witness(&ADMIN));
     database::put(utils::KEY_MP, mp_account);
     true
+}
+
+fn get_mp_account() -> Address {
+    database::get::<_, Address>(utils::KEY_MP).unwrap_or(ADMIN)
 }
 
 /// set charging model, need mp and seller signature
@@ -169,8 +173,20 @@ fn transfer(
     true
 }
 
-fn get_mp_account() -> Address {
-    database::get::<_, Address>(utils::KEY_MP).unwrap()
+fn migrate(
+    code: &[u8],
+    vm_type: u32,
+    name: &str,
+    version: &str,
+    author: &str,
+    email: &str,
+    desc: &str,
+) -> bool {
+    assert!(check_witness(&ADMIN));
+    let new_addr = contract_migrate(code, vm_type, name, version, author, email, desc);
+    let empty_addr = Address::new([0u8; 20]);
+    assert_ne!(new_addr, empty_addr);
+    true
 }
 
 #[no_mangle]
@@ -180,6 +196,10 @@ pub fn invoke() {
     let action: &[u8] = source.read().unwrap();
     let mut sink = Sink::new(12);
     match action {
+        b"migrate" => {
+            let (code, vm_type, name, version, author, email, desc) = source.read().unwrap();
+            sink.write(migrate(code, vm_type, name, version, author, email, desc));
+        }
         b"setFeeSplitModel" => {
             let (seller_acc, fee_split_model) = source.read().unwrap();
             sink.write(set_fee_split_model(seller_acc, fee_split_model));

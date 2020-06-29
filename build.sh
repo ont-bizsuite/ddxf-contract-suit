@@ -1,4 +1,4 @@
-cd ./contracts/dtoken
+cd ./contracts/openkg
 
 cargo build --release --target=wasm32-unknown-unknown
 

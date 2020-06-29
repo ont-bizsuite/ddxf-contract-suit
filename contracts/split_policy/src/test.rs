@@ -1,6 +1,7 @@
 use super::ostd::mock::build_runtime;
 use super::{
-    get_balance, get_register_param, register, transfer, withdraw, AddrAmt, RegisterParam,
+    get_balance, get_register_param, register, transfer, transfer_withdraw, withdraw, AddrAmt,
+    RegisterParam,
 };
 use common::TokenType;
 use hexutil::read_hex;
@@ -31,12 +32,12 @@ fn test_registry2() {
     let addr2 = Address::repeat_byte(2);
     let aa1 = AddrAmt {
         to: addr1,
-        percent: 1000,
+        weight: 1000,
         has_withdraw: false,
     };
     let aa2 = AddrAmt {
         to: addr2.clone(),
-        percent: 9000,
+        weight: 9000,
         has_withdraw: false,
     };
     let contract_addr = Address::repeat_byte(3);
@@ -74,4 +75,41 @@ fn test_registry2() {
     assert!(withdraw(key, &addr2));
     let rp = get_register_param(key);
     assert!(rp.addr_amt[1].has_withdraw);
+}
+
+#[test]
+fn test() {
+    let addr1 = Address::repeat_byte(1);
+    let addr2 = Address::repeat_byte(2);
+    let aa1 = AddrAmt {
+        to: addr1,
+        weight: 1000,
+        has_withdraw: false,
+    };
+    let aa2 = AddrAmt {
+        to: addr2.clone(),
+        weight: 9000,
+        has_withdraw: false,
+    };
+    let contract_addr = Address::repeat_byte(3);
+    let rp = RegisterParam {
+        addr_amt: vec![aa1.clone(), aa2],
+        token_type: TokenType::ONG,
+        contract_addr: Some(contract_addr),
+    };
+    let mut sink = Sink::new(64);
+    sink.write(rp);
+    let key = b"01";
+
+    let handle = build_runtime();
+    handle.witness(&[addr1.clone()]);
+    assert!(register(key, sink.bytes()));
+
+    let call_contract = move |_addr: &Address, _data: &[u8]| -> Option<Vec<u8>> { Some(vec![1u8]) };
+    handle.on_contract_call(call_contract);
+    let from = Address::repeat_byte(4);
+    handle.witness(&[from.clone()]);
+    assert!(transfer_withdraw(&from, key, 10000));
+    let rp = get_register_param(key);
+    assert!(rp.addr_amt[0].has_withdraw);
 }

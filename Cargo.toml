@@ -4,7 +4,6 @@ members = [
     "contracts/marketplace",
     "contracts/dtoken",
     "contracts/split_policy",
-    "contracts/data_id",
     "contracts/accountant",
     "contracts/openkg"
 ]
