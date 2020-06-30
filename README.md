@@ -2,7 +2,7 @@
 
 ddxf is a decentralized data exchange framework, aimed to solve the data self sovereign problem.
 
-For the impatient, [here](https://ont-bizsuite.github.io/ddxf-contract-suite/ddxf/) is the contract document for ddxf. 
+For the impatient, [here](https://ont-bizsuite.github.io/ddxf-contract-suite/marketplace/) is the contract document for ddxf. 
 
 There're 5 roles in this framework: Seller, Marketplace, Buyer, Registry and Browser.
 
