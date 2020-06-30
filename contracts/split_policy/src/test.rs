@@ -91,6 +91,11 @@ fn test() {
         weight: 9000,
         has_withdraw: false,
     };
+
+    let temp_vec = vec![aa1.clone(), aa2.clone()];
+    let total = temp_vec.iter().fold(0, |res, x| res + x.weight);
+    println!("total:{}", total);
+
     let contract_addr = Address::repeat_byte(3);
     let rp = RegisterParam {
         addr_amt: vec![aa1.clone(), aa2],
