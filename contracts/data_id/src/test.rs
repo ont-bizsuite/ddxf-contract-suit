@@ -15,6 +15,6 @@ fn test() {
     let action: &[u8] = source.read().unwrap();
     assert_eq!(action, b"reg_id_add_attribute_array");
 
-    let pa:Vec<Vec<u8>> = source.read().unwrap();
+    let pa: Vec<Vec<u8>> = source.read().unwrap();
     let a = 1;
 }
