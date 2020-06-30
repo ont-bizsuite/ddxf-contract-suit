@@ -1,4 +1,4 @@
-cd ./contracts/openkg
+cd ./contracts/data_id
 
 cargo build --release --target=wasm32-unknown-unknown
 
