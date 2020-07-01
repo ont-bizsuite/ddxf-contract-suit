@@ -2,18 +2,17 @@
 #![feature(proc_macro_hygiene)]
 extern crate ontio_std;
 use ontio_std as ostd;
-use ontio_std::abi::EventBuilder;
-use ontio_std::runtime::{check_witness, contract_migrate};
 use ostd::abi::{Decoder, Encoder, Sink, Source};
 use ostd::contract::ontid;
 use ostd::contract::ontid::{DDOAttribute, Group, Signer};
 use ostd::prelude::*;
-use ostd::runtime::{contract_delete, input, ret};
+use ostd::runtime::{input, ret};
+
+extern crate common;
+use common::CONTRACT_COMMON;
 
 #[cfg(test)]
 mod test;
-
-const ADMIN: Address = ostd::macros::base58!("Aejfo7ZX5PVpenRj23yChnyH64nf8T1zbu");
 
 #[derive(Encoder, Decoder)]
 struct RegIdAddAttributesParam {
@@ -28,32 +27,6 @@ impl RegIdAddAttributesParam {
         let mut source = Source::new(data);
         source.read().unwrap()
     }
-}
-
-fn destroy() {
-    assert!(check_witness(&ADMIN));
-    contract_delete();
-}
-
-/// upgrade contract
-fn migrate(
-    code: &[u8],
-    vm_type: u32,
-    name: &str,
-    version: &str,
-    author: &str,
-    email: &str,
-    desc: &str,
-) -> bool {
-    assert!(check_witness(&ADMIN));
-    let new_addr = contract_migrate(code, vm_type, name, version, author, email, desc);
-    let empty_addr = Address::new([0u8; 20]);
-    assert_ne!(new_addr, empty_addr);
-    EventBuilder::new()
-        .string("migrate")
-        .address(&new_addr)
-        .notify();
-    true
 }
 
 pub fn register_data_id_add_attribute_array(reg_id_bytes: Vec<Vec<u8>>) -> bool {
@@ -81,11 +54,11 @@ pub fn invoke() {
     let mut sink = Sink::new(12);
     match action {
         b"destroy" => {
-            destroy();
+            CONTRACT_COMMON.destroy();
         }
         b"migrate" => {
             let (code, vm_type, name, version, author, email, desc) = source.read().unwrap();
-            sink.write(migrate(code, vm_type, name, version, author, email, desc));
+            sink.write(CONTRACT_COMMON.migrate(code, vm_type, name, version, author, email, desc));
         }
         b"reg_id_add_attribute_array" => {
             let data_id_bytes: Vec<Vec<u8>> = source.read().unwrap();

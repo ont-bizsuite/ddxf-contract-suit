@@ -3,8 +3,10 @@
 extern crate ontio_std as ostd;
 use core::cmp::{Eq, Ord, PartialEq, PartialOrd};
 use core::option::Option;
+use ontio_std::abi::EventBuilder;
 use ostd::abi::{Decoder, Encoder, Error, Sink, Source};
 use ostd::prelude::*;
+use ostd::runtime::{check_witness, contract_delete, contract_migrate};
 
 #[cfg(test)]
 mod test;
@@ -111,6 +113,49 @@ impl<'a> Decoder<'a> for TokenType {
         }
     }
 }
+
+pub struct ContractCommon {
+    admin: Address,
+}
+
+impl ContractCommon {
+    const fn new(admin: Address) -> ContractCommon {
+        ContractCommon { admin: admin }
+    }
+
+    pub fn admin(&self) -> &Address {
+        return &self.admin;
+    }
+
+    pub fn destroy(&self) {
+        assert!(check_witness(&self.admin));
+        contract_delete();
+    }
+
+    pub fn migrate(
+        &self,
+        code: &[u8],
+        vm_type: u32,
+        name: &str,
+        version: &str,
+        author: &str,
+        email: &str,
+        desc: &str,
+    ) -> bool {
+        assert!(check_witness(&self.admin));
+        let new_addr = contract_migrate(code, vm_type, name, version, author, email, desc);
+        let empty_addr = Address::new([0u8; 20]);
+        assert_ne!(new_addr, empty_addr);
+        EventBuilder::new()
+            .string("migrate")
+            .address(&new_addr)
+            .notify();
+        true
+    }
+}
+
+pub static CONTRACT_COMMON: ContractCommon =
+    ContractCommon::new(ostd::macros::base58!("Aejfo7ZX5PVpenRj23yChnyH64nf8T1zbu"));
 
 #[cfg(test)]
 mod tests {

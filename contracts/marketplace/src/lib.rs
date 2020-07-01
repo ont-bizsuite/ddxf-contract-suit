@@ -26,7 +26,7 @@ mod dtoken;
 use common::*;
 use dtoken::*;
 use ostd::contract::wasm;
-use ostd::runtime::{check_witness, contract_migrate, current_txhash};
+use ostd::runtime::{check_witness, current_txhash};
 
 #[cfg(test)]
 mod test;
@@ -38,7 +38,6 @@ const KEY_ADMIN: &[u8] = b"05";
 
 //AbtTQJYKfQxq4UdygDsbLVjE8uRrJ2H3tP
 //AYnhakv7kC9R5ppw65JoE2rt6xDzCjCTvD
-const ADMIN: Address = ostd::macros::base58!("Aejfo7ZX5PVpenRj23yChnyH64nf8T1zbu");
 
 const DEFAULT_SPLIT_CONTRACT: Address = ostd::macros::base58!("ANzKSQWm7gLvJGrnMok2hoLQAoiLmuC5wq");
 const DEFAULT_DTOKEN_CONTRACT: Address =
@@ -49,7 +48,7 @@ const DEFAULT_DTOKEN_CONTRACT: Address =
 /// need admin signature
 /// `new_addr` is the new dtoken contract address
 pub fn set_dtoken_contract(new_addr: &Address) -> bool {
-    assert!(check_witness(&ADMIN));
+    assert!(check_witness(CONTRACT_COMMON.admin()));
     database::put(KEY_DTOKEN_CONTRACT, new_addr);
     true
 }
@@ -57,7 +56,7 @@ pub fn set_dtoken_contract(new_addr: &Address) -> bool {
 /// init contract
 /// set dtoken and split contract address
 pub fn init(dtoken: Address, split_policy: Address) -> bool {
-    assert!(check_witness(&ADMIN));
+    assert!(check_witness(CONTRACT_COMMON.admin()));
     database::put(KEY_DTOKEN_CONTRACT, dtoken);
     database::put(KEY_SPLIT_POLICY_CONTRACT, split_policy);
     true
@@ -74,7 +73,7 @@ pub fn get_dtoken_contract() -> Address {
 ///
 /// need admin signature
 pub fn set_split_policy_contract(new_addr: &Address) -> bool {
-    assert!(check_witness(&ADMIN));
+    assert!(check_witness(CONTRACT_COMMON.admin()));
     database::put(KEY_SPLIT_POLICY_CONTRACT, new_addr);
     true
 }
@@ -96,7 +95,7 @@ fn update_admin(new_admin: &Address) -> bool {
 
 /// query admin address
 fn get_admin() -> Address {
-    database::get::<_, Address>(KEY_ADMIN).unwrap_or(ADMIN)
+    database::get::<_, Address>(KEY_ADMIN).unwrap_or(*CONTRACT_COMMON.admin())
 }
 
 /// seller publish product, need seller signature
@@ -493,28 +492,6 @@ pub fn buy_dtoken_reward(
     true
 }
 
-/// upgrade contract
-fn migrate(
-    code: &[u8],
-    vm_type: u32,
-    name: &str,
-    version: &str,
-    author: &str,
-    email: &str,
-    desc: &str,
-) -> bool {
-    let admin = get_admin();
-    assert!(check_witness(&admin));
-    let new_addr = contract_migrate(code, vm_type, name, version, author, email, desc);
-    let empty_addr = Address::new([0u8; 20]);
-    assert_ne!(new_addr, empty_addr);
-    EventBuilder::new()
-        .string("migrate")
-        .address(&new_addr)
-        .notify();
-    true
-}
-
 // inner method
 fn transfer_fee(
     oi: &OrderId,
@@ -589,7 +566,7 @@ pub fn invoke() {
         }
         b"migrate" => {
             let (code, vm_type, name, version, author, email, desc) = source.read().unwrap();
-            sink.write(migrate(code, vm_type, name, version, author, email, desc));
+            sink.write(CONTRACT_COMMON.migrate(code, vm_type, name, version, author, email, desc));
         }
         b"update" => {
             let (resource_id, resource_ddo, item, split_policy_param_bytes) =

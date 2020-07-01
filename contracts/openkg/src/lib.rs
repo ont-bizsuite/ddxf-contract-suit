@@ -1,16 +1,17 @@
 #![cfg_attr(not(feature = "mock"), no_std)]
 #![feature(proc_macro_hygiene)]
 extern crate alloc;
+extern crate common;
 extern crate ontio_std as ostd;
-use ostd::abi::{EventBuilder, Sink, Source};
+use common::CONTRACT_COMMON;
+use ostd::abi::{Sink, Source};
 use ostd::contract::wasm;
 use ostd::database;
 use ostd::prelude::*;
 use ostd::runtime;
-use ostd::runtime::{check_witness, contract_migrate};
+use ostd::runtime::check_witness;
 use ostd::types::{Address, U128};
 
-const ADMIN: Address = ostd::macros::base58!("Aejfo7ZX5PVpenRj23yChnyH64nf8T1zbu");
 const MP_CONTRACT_ADDRESS: Address = ostd::macros::base58!("AdD2eNZihgt1QSy6WcxaZrxGUQi6mmx793");
 const DTOKEN_CONTRACT_ADDRESS: Address =
     ostd::macros::base58!("AQJzHbcT9pti1zzV2cRZ92B1i1z8QNN2n6");
@@ -18,33 +19,12 @@ const DTOKEN_CONTRACT_ADDRESS: Address =
 const KEY_MP_CONTRACT: &[u8] = b"01";
 const KEY_DTOKEN_CONTRACT: &[u8] = b"02";
 
-/// upgrade contract
-fn migrate(
-    code: &[u8],
-    vm_type: u32,
-    name: &str,
-    version: &str,
-    author: &str,
-    email: &str,
-    desc: &str,
-) -> bool {
-    assert!(check_witness(&ADMIN));
-    let new_addr = contract_migrate(code, vm_type, name, version, author, email, desc);
-    let empty_addr = Address::new([0u8; 20]);
-    assert_ne!(new_addr, empty_addr);
-    EventBuilder::new()
-        .string("migrate")
-        .address(&new_addr)
-        .notify();
-    true
-}
-
 fn get_mp_contract_addr() -> Address {
     database::get::<_, Address>(KEY_MP_CONTRACT).unwrap_or(MP_CONTRACT_ADDRESS)
 }
 
 fn set_mp_contract_addr(mp: &Address) -> bool {
-    assert!(check_witness(&ADMIN));
+    assert!(check_witness(CONTRACT_COMMON.admin()));
     database::put(KEY_MP_CONTRACT, mp);
     true
 }
@@ -54,7 +34,7 @@ fn get_dtoken_contract_addr() -> Address {
 }
 
 fn set_dtoken_contract_addr(dtoken: &Address) -> bool {
-    assert!(check_witness(&ADMIN));
+    assert!(check_witness(CONTRACT_COMMON.admin()));
     database::put(KEY_DTOKEN_CONTRACT, dtoken);
     true
 }
@@ -203,7 +183,7 @@ fn invoke() {
     match action {
         b"migrate" => {
             let (code, vm_type, name, version, author, email, desc) = source.read().unwrap();
-            sink.write(migrate(code, vm_type, name, version, author, email, desc));
+            sink.write(CONTRACT_COMMON.migrate(code, vm_type, name, version, author, email, desc));
         }
         b"setDtokenContractAddr" => {
             let dtoken = source.read().unwrap();
