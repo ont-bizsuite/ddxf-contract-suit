@@ -12,6 +12,7 @@ use ostd::runtime;
 use ostd::types::{Address, U128};
 mod basic;
 use basic::*;
+use common::BASE_CONTRACT;
 use ostd::runtime::check_witness;
 
 #[cfg(test)]
@@ -20,8 +21,6 @@ mod test;
 const KEY_DTOKEN: &[u8] = b"01";
 const KEY_DDXF_CONTRACT: &[u8] = b"02";
 const KEY_ADMIN: &[u8] = b"03";
-
-const ADMIN: Address = ostd::macros::base58!("Aejfo7ZX5PVpenRj23yChnyH64nf8T1zbu");
 
 /// set marketplace contract address, need admin signature
 ///
@@ -50,7 +49,7 @@ fn update_admin(new_admin: &Address) -> bool {
 
 /// query admin address
 fn get_admin() -> Address {
-    database::get::<_, Address>(KEY_ADMIN).unwrap_or(ADMIN)
+    database::get::<_, Address>(KEY_ADMIN).unwrap_or(*BASE_CONTRACT.admin())
 }
 
 /// generate dtoken
@@ -117,7 +116,7 @@ pub fn use_token(account: &Address, token_template_bytes: &[u8], n: U128) -> boo
 }
 
 fn delete_token(account: &Address, token_template_bytes: &[u8]) -> bool {
-    assert!(check_witness(account) || check_witness(&ADMIN));
+    assert!(check_witness(account) || check_witness(BASE_CONTRACT.admin()));
     let caa = get_count_and_agent(account, token_template_bytes);
     assert_eq!(caa.count, 0);
     database::delete(utils::generate_dtoken_key(account, token_template_bytes));
@@ -354,23 +353,6 @@ pub fn remove_token_agents(
     true
 }
 
-fn migrate(
-    code: &[u8],
-    vm_type: u32,
-    name: &str,
-    version: &str,
-    author: &str,
-    email: &str,
-    desc: &str,
-) -> bool {
-    let admin = get_admin();
-    assert!(check_witness(&admin));
-    let new_addr = runtime::contract_migrate(code, vm_type, name, version, author, email, desc);
-    let empty_addr = Address::new([0u8; 20]);
-    assert_ne!(new_addr, empty_addr);
-    true
-}
-
 fn check_caller() {
     let caller = runtime::caller();
     let ddxf = get_mp_contract();
@@ -410,7 +392,7 @@ pub fn invoke() {
         }
         b"migrate" => {
             let (code, vm_type, name, version, author, email, desc) = source.read().unwrap();
-            sink.write(migrate(code, vm_type, name, version, author, email, desc));
+            sink.write(BASE_CONTRACT.migrate(code, vm_type, name, version, author, email, desc));
         }
         b"generateDToken" => {
             let (account, templates, n) = source.read().unwrap();

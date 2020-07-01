@@ -4,9 +4,9 @@ extern crate ontio_std as ostd;
 use ostd::abi::{EventBuilder, Sink, Source};
 use ostd::database;
 use ostd::prelude::*;
-use ostd::runtime::{address, check_witness, contract_migrate, input, ret, storage_read};
+use ostd::runtime::{address, check_witness, input, ret, storage_read};
 extern crate common;
-use common::TokenType;
+use common::{TokenType, BASE_CONTRACT};
 use ostd::abi::{Decoder, Encoder};
 use ostd::contract::{ong, ont, wasm};
 
@@ -15,7 +15,6 @@ mod test;
 
 const KEY_REGISTRY_PARM: &[u8] = b"01";
 const KEY_BALANCE: &[u8] = b"02";
-const ADMIN: Address = ostd::macros::base58!("Aejfo7ZX5PVpenRj23yChnyH64nf8T1zbu");
 
 #[derive(Encoder, Decoder, Clone)]
 pub struct AddrAmt {
@@ -191,22 +190,6 @@ fn transfer_inner(
     true
 }
 
-fn migrate(
-    code: &[u8],
-    vm_type: u32,
-    name: &str,
-    version: &str,
-    author: &str,
-    email: &str,
-    desc: &str,
-) -> bool {
-    assert!(check_witness(&ADMIN));
-    let new_addr = contract_migrate(code, vm_type, name, version, author, email, desc);
-    let empty_addr = Address::new([0u8; 20]);
-    assert_ne!(new_addr, empty_addr);
-    true
-}
-
 fn generate_registry_param_key(key: &[u8]) -> Vec<u8> {
     [KEY_REGISTRY_PARM, key].concat()
 }
@@ -224,7 +207,7 @@ pub fn invoke() {
     match action {
         b"migrate" => {
             let (code, vm_type, name, version, author, email, desc) = source.read().unwrap();
-            sink.write(migrate(code, vm_type, name, version, author, email, desc));
+            sink.write(BASE_CONTRACT.migrate(code, vm_type, name, version, author, email, desc));
         }
         b"register" => {
             let (key, param_bytes) = source.read().unwrap();

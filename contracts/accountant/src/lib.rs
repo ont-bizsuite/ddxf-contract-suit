@@ -6,7 +6,7 @@ use ostd::abi::{Decoder, Encoder, Sink, Source};
 use ostd::contract::{ong, ont, wasm};
 use ostd::database;
 use ostd::prelude::*;
-use ostd::runtime::{address, check_witness, contract_migrate, input, ret};
+use ostd::runtime::{address, check_witness, input, ret};
 use ostd::types::{Address, U128};
 
 mod utils;
@@ -15,22 +15,21 @@ use utils::*;
 mod basic;
 use basic::*;
 extern crate common;
-use common::{Fee, OrderId, TokenType};
+use common::{Fee, OrderId, TokenType, BASE_CONTRACT};
 
 #[cfg(test)]
 mod test;
 
 const MAX_PERCENTAGE: U128 = 10000;
-const ADMIN: Address = ostd::macros::base58!("Aejfo7ZX5PVpenRj23yChnyH64nf8T1zbu");
 
 fn set_mp(mp_account: &Address) -> bool {
-    assert!(check_witness(&ADMIN));
+    assert!(check_witness(BASE_CONTRACT.admin()));
     database::put(utils::KEY_MP, mp_account);
     true
 }
 
 fn get_mp_account() -> Address {
-    database::get::<_, Address>(utils::KEY_MP).unwrap_or(ADMIN)
+    database::get::<_, Address>(utils::KEY_MP).unwrap_or(*BASE_CONTRACT.admin())
 }
 
 /// set charging model, need mp and seller signature
@@ -173,22 +172,6 @@ fn transfer(
     true
 }
 
-fn migrate(
-    code: &[u8],
-    vm_type: u32,
-    name: &str,
-    version: &str,
-    author: &str,
-    email: &str,
-    desc: &str,
-) -> bool {
-    assert!(check_witness(&ADMIN));
-    let new_addr = contract_migrate(code, vm_type, name, version, author, email, desc);
-    let empty_addr = Address::new([0u8; 20]);
-    assert_ne!(new_addr, empty_addr);
-    true
-}
-
 #[no_mangle]
 pub fn invoke() {
     let input = input();
@@ -198,7 +181,7 @@ pub fn invoke() {
     match action {
         b"migrate" => {
             let (code, vm_type, name, version, author, email, desc) = source.read().unwrap();
-            sink.write(migrate(code, vm_type, name, version, author, email, desc));
+            sink.write(BASE_CONTRACT.migrate(code, vm_type, name, version, author, email, desc));
         }
         b"setFeeSplitModel" => {
             let (seller_acc, fee_split_model) = source.read().unwrap();
