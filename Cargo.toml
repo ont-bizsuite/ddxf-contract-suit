@@ -5,7 +5,8 @@ members = [
     "contracts/dtoken",
     "contracts/split_policy",
     "contracts/accountant",
-    "contracts/openkg"
+    "contracts/openkg",
+    "contracts/data_id"
 ]
 
 [profile.release]
