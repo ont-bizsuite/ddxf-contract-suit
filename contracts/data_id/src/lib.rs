@@ -9,7 +9,7 @@ use ostd::prelude::*;
 use ostd::runtime::{input, ret};
 
 extern crate common;
-use common::BASE_CONTRACT;
+use common::CONTRACT_COMMON;
 
 #[cfg(test)]
 mod test;
@@ -54,11 +54,11 @@ pub fn invoke() {
     let mut sink = Sink::new(12);
     match action {
         b"destroy" => {
-            BASE_CONTRACT.destroy();
+            CONTRACT_COMMON.destroy();
         }
         b"migrate" => {
             let (code, vm_type, name, version, author, email, desc) = source.read().unwrap();
-            sink.write(BASE_CONTRACT.migrate(code, vm_type, name, version, author, email, desc));
+            sink.write(CONTRACT_COMMON.migrate(code, vm_type, name, version, author, email, desc));
         }
         b"reg_id_add_attribute_array" => {
             let data_id_bytes: Vec<Vec<u8>> = source.read().unwrap();

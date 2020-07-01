@@ -3,7 +3,7 @@
 extern crate alloc;
 extern crate common;
 extern crate ontio_std as ostd;
-use common::BASE_CONTRACT;
+use common::CONTRACT_COMMON;
 use ostd::abi::{Sink, Source};
 use ostd::contract::wasm;
 use ostd::database;
@@ -24,7 +24,7 @@ fn get_mp_contract_addr() -> Address {
 }
 
 fn set_mp_contract_addr(mp: &Address) -> bool {
-    assert!(check_witness(BASE_CONTRACT.admin()));
+    assert!(check_witness(CONTRACT_COMMON.admin()));
     database::put(KEY_MP_CONTRACT, mp);
     true
 }
@@ -34,7 +34,7 @@ fn get_dtoken_contract_addr() -> Address {
 }
 
 fn set_dtoken_contract_addr(dtoken: &Address) -> bool {
-    assert!(check_witness(BASE_CONTRACT.admin()));
+    assert!(check_witness(CONTRACT_COMMON.admin()));
     database::put(KEY_DTOKEN_CONTRACT, dtoken);
     true
 }
@@ -183,7 +183,7 @@ fn invoke() {
     match action {
         b"migrate" => {
             let (code, vm_type, name, version, author, email, desc) = source.read().unwrap();
-            sink.write(BASE_CONTRACT.migrate(code, vm_type, name, version, author, email, desc));
+            sink.write(CONTRACT_COMMON.migrate(code, vm_type, name, version, author, email, desc));
         }
         b"setDtokenContractAddr" => {
             let dtoken = source.read().unwrap();

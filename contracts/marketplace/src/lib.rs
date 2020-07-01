@@ -48,7 +48,7 @@ const DEFAULT_DTOKEN_CONTRACT: Address =
 /// need admin signature
 /// `new_addr` is the new dtoken contract address
 pub fn set_dtoken_contract(new_addr: &Address) -> bool {
-    assert!(check_witness(BASE_CONTRACT.admin()));
+    assert!(check_witness(CONTRACT_COMMON.admin()));
     database::put(KEY_DTOKEN_CONTRACT, new_addr);
     true
 }
@@ -56,7 +56,7 @@ pub fn set_dtoken_contract(new_addr: &Address) -> bool {
 /// init contract
 /// set dtoken and split contract address
 pub fn init(dtoken: Address, split_policy: Address) -> bool {
-    assert!(check_witness(BASE_CONTRACT.admin()));
+    assert!(check_witness(CONTRACT_COMMON.admin()));
     database::put(KEY_DTOKEN_CONTRACT, dtoken);
     database::put(KEY_SPLIT_POLICY_CONTRACT, split_policy);
     true
@@ -73,7 +73,7 @@ pub fn get_dtoken_contract() -> Address {
 ///
 /// need admin signature
 pub fn set_split_policy_contract(new_addr: &Address) -> bool {
-    assert!(check_witness(BASE_CONTRACT.admin()));
+    assert!(check_witness(CONTRACT_COMMON.admin()));
     database::put(KEY_SPLIT_POLICY_CONTRACT, new_addr);
     true
 }
@@ -95,7 +95,7 @@ fn update_admin(new_admin: &Address) -> bool {
 
 /// query admin address
 fn get_admin() -> Address {
-    database::get::<_, Address>(KEY_ADMIN).unwrap_or(*BASE_CONTRACT.admin())
+    database::get::<_, Address>(KEY_ADMIN).unwrap_or(*CONTRACT_COMMON.admin())
 }
 
 /// seller publish product, need seller signature
@@ -566,7 +566,7 @@ pub fn invoke() {
         }
         b"migrate" => {
             let (code, vm_type, name, version, author, email, desc) = source.read().unwrap();
-            sink.write(BASE_CONTRACT.migrate(code, vm_type, name, version, author, email, desc));
+            sink.write(CONTRACT_COMMON.migrate(code, vm_type, name, version, author, email, desc));
         }
         b"update" => {
             let (resource_id, resource_ddo, item, split_policy_param_bytes) =

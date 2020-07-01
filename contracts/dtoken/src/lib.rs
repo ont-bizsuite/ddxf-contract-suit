@@ -12,7 +12,7 @@ use ostd::runtime;
 use ostd::types::{Address, U128};
 mod basic;
 use basic::*;
-use common::BASE_CONTRACT;
+use common::CONTRACT_COMMON;
 use ostd::runtime::check_witness;
 
 #[cfg(test)]
@@ -49,7 +49,7 @@ fn update_admin(new_admin: &Address) -> bool {
 
 /// query admin address
 fn get_admin() -> Address {
-    database::get::<_, Address>(KEY_ADMIN).unwrap_or(*BASE_CONTRACT.admin())
+    database::get::<_, Address>(KEY_ADMIN).unwrap_or(*CONTRACT_COMMON.admin())
 }
 
 /// generate dtoken
@@ -116,7 +116,7 @@ pub fn use_token(account: &Address, token_template_bytes: &[u8], n: U128) -> boo
 }
 
 fn delete_token(account: &Address, token_template_bytes: &[u8]) -> bool {
-    assert!(check_witness(account) || check_witness(BASE_CONTRACT.admin()));
+    assert!(check_witness(account) || check_witness(CONTRACT_COMMON.admin()));
     let caa = get_count_and_agent(account, token_template_bytes);
     assert_eq!(caa.count, 0);
     database::delete(utils::generate_dtoken_key(account, token_template_bytes));
@@ -392,7 +392,7 @@ pub fn invoke() {
         }
         b"migrate" => {
             let (code, vm_type, name, version, author, email, desc) = source.read().unwrap();
-            sink.write(BASE_CONTRACT.migrate(code, vm_type, name, version, author, email, desc));
+            sink.write(CONTRACT_COMMON.migrate(code, vm_type, name, version, author, email, desc));
         }
         b"generateDToken" => {
             let (account, templates, n) = source.read().unwrap();

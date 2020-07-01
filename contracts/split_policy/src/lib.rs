@@ -6,7 +6,7 @@ use ostd::database;
 use ostd::prelude::*;
 use ostd::runtime::{address, check_witness, input, ret, storage_read};
 extern crate common;
-use common::{TokenType, BASE_CONTRACT};
+use common::{TokenType, CONTRACT_COMMON};
 use ostd::abi::{Decoder, Encoder};
 use ostd::contract::{ong, ont, wasm};
 
@@ -207,7 +207,7 @@ pub fn invoke() {
     match action {
         b"migrate" => {
             let (code, vm_type, name, version, author, email, desc) = source.read().unwrap();
-            sink.write(BASE_CONTRACT.migrate(code, vm_type, name, version, author, email, desc));
+            sink.write(CONTRACT_COMMON.migrate(code, vm_type, name, version, author, email, desc));
         }
         b"register" => {
             let (key, param_bytes) = source.read().unwrap();

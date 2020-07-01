@@ -15,7 +15,7 @@ use utils::*;
 mod basic;
 use basic::*;
 extern crate common;
-use common::{Fee, OrderId, TokenType, BASE_CONTRACT};
+use common::{Fee, OrderId, TokenType, CONTRACT_COMMON};
 
 #[cfg(test)]
 mod test;
@@ -23,13 +23,13 @@ mod test;
 const MAX_PERCENTAGE: U128 = 10000;
 
 fn set_mp(mp_account: &Address) -> bool {
-    assert!(check_witness(BASE_CONTRACT.admin()));
+    assert!(check_witness(CONTRACT_COMMON.admin()));
     database::put(utils::KEY_MP, mp_account);
     true
 }
 
 fn get_mp_account() -> Address {
-    database::get::<_, Address>(utils::KEY_MP).unwrap_or(*BASE_CONTRACT.admin())
+    database::get::<_, Address>(utils::KEY_MP).unwrap_or(*CONTRACT_COMMON.admin())
 }
 
 /// set charging model, need mp and seller signature
@@ -181,7 +181,7 @@ pub fn invoke() {
     match action {
         b"migrate" => {
             let (code, vm_type, name, version, author, email, desc) = source.read().unwrap();
-            sink.write(BASE_CONTRACT.migrate(code, vm_type, name, version, author, email, desc));
+            sink.write(CONTRACT_COMMON.migrate(code, vm_type, name, version, author, email, desc));
         }
         b"setFeeSplitModel" => {
             let (seller_acc, fee_split_model) = source.read().unwrap();

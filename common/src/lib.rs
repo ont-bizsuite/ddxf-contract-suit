@@ -114,13 +114,13 @@ impl<'a> Decoder<'a> for TokenType {
     }
 }
 
-pub struct BaseContract {
+pub struct ContractCommon {
     admin: Address,
 }
 
-impl BaseContract {
-    const fn new(admin: Address) -> BaseContract {
-        BaseContract { admin: admin }
+impl ContractCommon {
+    const fn new(admin: Address) -> ContractCommon {
+        ContractCommon { admin: admin }
     }
 
     pub fn admin(&self) -> &Address {
@@ -154,8 +154,8 @@ impl BaseContract {
     }
 }
 
-pub static BASE_CONTRACT: BaseContract =
-    BaseContract::new(ostd::macros::base58!("Aejfo7ZX5PVpenRj23yChnyH64nf8T1zbu"));
+pub static CONTRACT_COMMON: ContractCommon =
+    ContractCommon::new(ostd::macros::base58!("Aejfo7ZX5PVpenRj23yChnyH64nf8T1zbu"));
 
 #[cfg(test)]
 mod tests {
