@@ -32,6 +32,17 @@ impl RegIdAddAttributesParam {
 /// register data_id and add_attribute for dataId
 ///
 /// `reg_id_bytes` is array of RegIdAddAttributesParam
+/// `RegIdAddAttributesParam` is defined as follow:
+/// ```
+/// use ostd::contract::ontid::{DDOAttribute, Group, Signer};
+/// #[derive(Encoder, Decoder)]
+///    struct RegIdAddAttributesParam {
+///        ont_id: Vec<u8>,               // data_id
+///        group: Group,                  // Group contains all controllers's ont_id
+///        signer: Vec<Signer>,           // Signer represents the ontid of the controller contained in the group, need signer's signature
+///        attributes: Vec<DDOAttribute>, //attributes user defined data information
+///    }
+/// ```
 ///
 pub fn reg_id_add_attribute_array(reg_id_bytes: Vec<Vec<u8>>) -> bool {
     for param_bytes in reg_id_bytes.iter() {
