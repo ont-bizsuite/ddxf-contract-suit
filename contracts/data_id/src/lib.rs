@@ -16,10 +16,10 @@ mod test;
 
 #[derive(Encoder, Decoder)]
 struct RegIdAddAttributesParam {
-    ont_id: Vec<u8>,
-    group: Group,
-    signer: Vec<Signer>,
-    attributes: Vec<DDOAttribute>,
+    ont_id: Vec<u8>,               // data_id
+    group: Group,                  // Group contains all controllers's ont_id
+    signer: Vec<Signer>, // Signer represents the ontid of the controller contained in the group, need signer's signature
+    attributes: Vec<DDOAttribute>, //attributes user defined data information
 }
 
 impl RegIdAddAttributesParam {
@@ -29,7 +29,11 @@ impl RegIdAddAttributesParam {
     }
 }
 
-pub fn register_data_id_add_attribute_array(reg_id_bytes: Vec<Vec<u8>>) -> bool {
+/// register data_id and add_attribute for dataId
+///
+/// `reg_id_bytes` is array of RegIdAddAttributesParam
+///
+pub fn reg_id_add_attribute_array(reg_id_bytes: Vec<Vec<u8>>) -> bool {
     for param_bytes in reg_id_bytes.iter() {
         let reg_id = RegIdAddAttributesParam::from_bytes(param_bytes.as_slice());
         assert!(ontid::reg_id_with_controller(
@@ -62,7 +66,7 @@ pub fn invoke() {
         }
         b"reg_id_add_attribute_array" => {
             let data_id_bytes: Vec<Vec<u8>> = source.read().unwrap();
-            sink.write(register_data_id_add_attribute_array(data_id_bytes));
+            sink.write(reg_id_add_attribute_array(data_id_bytes));
         }
         _ => {
             let method = str::from_utf8(action).ok().unwrap();
