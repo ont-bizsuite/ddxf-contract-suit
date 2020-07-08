@@ -133,7 +133,6 @@ fn serialize() {
     let h = H256::repeat_byte(1);
     let ddo = ResourceDDO {
         manager: manager.clone(),
-        token_resource_ty_endpoints: vec![],
         item_meta_hash: h,
         dtoken_contract_address: Some(dtoken_contract.clone()),
         mp_contract_address: None,
@@ -155,7 +154,6 @@ fn publish() {
     let mp_contract_address = Address::repeat_byte(3);
 
     let ddo = ResourceDDO {
-        token_resource_ty_endpoints: vec![],
         item_meta_hash: H256::repeat_byte(1),
         manager: manager.clone(),
         dtoken_contract_address: Some(dtoken_contract_address.clone()),

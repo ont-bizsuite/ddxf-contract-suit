@@ -11,16 +11,23 @@ use ostd::prelude::*;
 use ostd::runtime;
 use ostd::types::{Address, U128};
 mod basic;
+use crate::oep8::generate_token;
 use basic::*;
 use common::CONTRACT_COMMON;
 use ostd::runtime::check_witness;
 
+mod oep8;
+
 #[cfg(test)]
 mod test;
+
+#[cfg(test)]
+mod oep8_test;
 
 const KEY_DTOKEN: &[u8] = b"01";
 const KEY_DDXF_CONTRACT: &[u8] = b"02";
 const KEY_ADMIN: &[u8] = b"03";
+const PRE_ID: &[u8] = b"04";
 
 /// set marketplace contract address, need admin signature
 ///
@@ -69,15 +76,14 @@ pub fn generate_dtoken(account: &Address, templates_bytes: &[u8], n: U128) -> bo
     check_caller();
     assert!(runtime::check_witness(account));
     for token_template in templates.iter() {
-        let key = token_template.to_bytes();
-        let mut caa = get_count_and_agent(account, &key);
+        let token_id = oep8::generate_token(b"", b"", n, account);
+        let mut caa = get_count_and_agent(account, token_id.as_slice());
         caa.count += n as u32;
-        update_count(account, &token_template.to_bytes(), caa.clone());
-        EventBuilder::new()
-            .string("generateDToken")
-            .string("token_template")
-            .bytearray(&token_template.to_bytes())
-            .notify();
+        database::put(
+            utils::gen_key(token_template.to_bytes().as_slice()),
+            token_id.as_slice(),
+        );
+        update_count(account, token_id.as_slice(), caa.clone());
     }
     EventBuilder::new()
         .string("generateDToken")
@@ -364,8 +370,8 @@ fn get_count_and_agent(account: &Address, token_template_bytes: &[u8]) -> CountA
     database::get::<_, CountAndAgent>(&key).unwrap_or(CountAndAgent::new(account.clone()))
 }
 
-fn update_count(account: &Address, token_template: &[u8], caa: CountAndAgent) {
-    let key = utils::generate_dtoken_key(account, token_template);
+fn update_count(account: &Address, token_id: &[u8], caa: CountAndAgent) {
+    let key = utils::generate_dtoken_key(account, token_id);
     database::put(key, caa);
 }
 
@@ -469,7 +475,10 @@ pub fn invoke() {
 mod utils {
     use super::*;
     use alloc::vec::Vec;
-    pub fn generate_dtoken_key(account: &Address, token_template_bytes: &[u8]) -> Vec<u8> {
-        [KEY_DTOKEN, account.as_ref(), token_template_bytes].concat()
+    pub fn generate_dtoken_key(account: &Address, token_id: &[u8]) -> Vec<u8> {
+        [KEY_DTOKEN, account.as_ref(), token_id].concat()
+    }
+    pub fn gen_key(token_template_bytes: &[u8]) -> Vec<u8> {
+        [PRE_ID, token_template_bytes].concat()
     }
 }
