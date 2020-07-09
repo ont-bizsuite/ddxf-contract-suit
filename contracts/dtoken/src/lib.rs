@@ -28,6 +28,8 @@ const KEY_DTOKEN: &[u8] = b"01";
 const KEY_DDXF_CONTRACT: &[u8] = b"02";
 const KEY_ADMIN: &[u8] = b"03";
 const PRE_ID: &[u8] = b"04";
+const KEY_TT_ID:&[u8] = b"05";
+const PRE_TT:&[u8] = b"06";
 
 /// set marketplace contract address, need admin signature
 ///
@@ -91,6 +93,32 @@ pub fn generate_dtoken(account: &Address, templates_bytes: &[u8], n: U128) -> bo
         .number(n)
         .notify();
     true
+}
+
+pub fn create_token_template(creator:&Address, tt_bs:&[u8]) -> bool {
+
+}
+
+pub fn authorize_token_template(creator:&Address, token_template_id:&[u8], authorized_addr: &Address) -> bool {
+
+}
+
+
+pub fn generate_token(buyer:&Address, tt_bs:&[u8], n:U128) -> bool {
+    check_caller();
+    assert!(check_witness(buyer));
+    let tt = TokenTemplate::from_bytes(tt_bs);
+    let tt_id = get_next_tt_id();
+    let tt_id_str = tt_id.to_string();
+    database::put(get_key(PRE_TT, tt_id_str.as_bytes()), tt);
+    true
+}
+
+fn get_key(pre:&[u8], post:&[u8]) -> Vec<u8> {
+    [pre, post].concat()
+}
+fn get_next_tt_id() -> U128 {
+    database::get::<_, U128>(KEY_TT_ID).unwrap_or(0)
 }
 
 /// use token, the buyer of the token has the right to consume the token
