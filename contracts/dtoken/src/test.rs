@@ -4,6 +4,23 @@ use hexutil::to_hex;
 use ostd::mock::build_runtime;
 
 #[test]
+fn test_create_tt() {
+    let handle = build_runtime();
+    let creator = Address::repeat_byte(1);
+    handle.witness(&[creator.clone()]);
+    let tt = TokenTemplate::new(None, vec![], vec![0u8]);
+    assert!(create_token_template(&creator, tt.to_bytes().as_slice()));
+    let token_template_id = b"0";
+    let authorized_addr = Address::repeat_byte(2);
+    assert!(authorize_token_template(
+        token_template_id,
+        &authorized_addr
+    ));
+    let addr = get_authorized_addr(token_template_id);
+    assert_eq!(addr.len(), 1);
+}
+
+#[test]
 fn test2() {
     let account = Address::repeat_byte(1);
     let mut caa = CountAndAgent::new(account);

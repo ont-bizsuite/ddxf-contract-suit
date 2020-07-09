@@ -11,7 +11,6 @@ use ostd::prelude::*;
 use ostd::runtime;
 use ostd::types::{Address, U128};
 mod basic;
-use crate::oep8::generate_token;
 use basic::*;
 use common::CONTRACT_COMMON;
 use ostd::runtime::check_witness;
@@ -28,8 +27,10 @@ const KEY_DTOKEN: &[u8] = b"01";
 const KEY_DDXF_CONTRACT: &[u8] = b"02";
 const KEY_ADMIN: &[u8] = b"03";
 const PRE_ID: &[u8] = b"04";
-const KEY_TT_ID:&[u8] = b"05";
-const PRE_TT:&[u8] = b"06";
+const KEY_TT_ID: &[u8] = b"05";
+const PRE_TT: &[u8] = b"06";
+const PRE_AUTHORIZED: &[u8] = b"07";
+const PRE_TOKEN_ID: &[u8] = b"08";
 
 /// set marketplace contract address, need admin signature
 ///
@@ -95,30 +96,82 @@ pub fn generate_dtoken(account: &Address, templates_bytes: &[u8], n: U128) -> bo
     true
 }
 
-pub fn create_token_template(creator:&Address, tt_bs:&[u8]) -> bool {
-
-}
-
-pub fn authorize_token_template(creator:&Address, token_template_id:&[u8], authorized_addr: &Address) -> bool {
-
-}
-
-
-pub fn generate_token(buyer:&Address, tt_bs:&[u8], n:U128) -> bool {
-    check_caller();
-    assert!(check_witness(buyer));
-    let tt = TokenTemplate::from_bytes(tt_bs);
+pub fn create_token_template(creator: &Address, tt_bs: &[u8]) -> bool {
+    assert!(check_witness(creator));
     let tt_id = get_next_tt_id();
     let tt_id_str = tt_id.to_string();
-    database::put(get_key(PRE_TT, tt_id_str.as_bytes()), tt);
+    database::put(
+        get_key(PRE_TT, tt_id_str.as_bytes()),
+        TokenTemplateInfo::new(creator.clone(), tt_bs.to_vec()),
+    );
+    update_next_tt_id(tt_id + 1);
+    EventBuilder::new()
+        .string("create_token_template")
+        .address(creator)
+        .bytearray(tt_bs)
+        .bytearray(tt_id_str.as_bytes())
+        .notify();
     true
 }
 
-fn get_key(pre:&[u8], post:&[u8]) -> Vec<u8> {
+pub fn authorize_token_template(token_template_id: &[u8], authorized_addr: &Address) -> bool {
+    let tt_info = database::get::<_, TokenTemplateInfo>(get_key(PRE_TT, token_template_id))
+        .expect("not existed token template");
+    assert!(check_witness(&tt_info.creator));
+    let mut addrs = get_authorized_addr(token_template_id);
+    let index = addrs.iter().position(|x| x == authorized_addr);
+    if index.is_none() {
+        addrs.push(*authorized_addr);
+        let key = get_key(PRE_AUTHORIZED, token_template_id);
+        database::put(key.as_slice(), addrs);
+    }
+    true
+}
+
+fn get_authorized_addr(token_template_id: &[u8]) -> Vec<Address> {
+    let key = get_key(PRE_AUTHORIZED, token_template_id);
+    database::get::<_, Vec<Address>>(key.as_slice()).unwrap_or(vec![])
+}
+
+fn is_valid_addr(acc: &Address, token_template_id: &[u8]) -> bool {
+    let tt_info = database::get::<_, TokenTemplateInfo>(get_key(PRE_TT, token_template_id))
+        .expect("not existed token template");
+    if &tt_info.creator == acc {
+        return true;
+    } else {
+        let addrs = get_authorized_addr(token_template_id);
+        let index = addrs.iter().position(|x| x == acc);
+        if index.is_some() {
+            return true;
+        }
+    }
+    false
+}
+
+pub fn generate_token(acc: &Address, token_template_id: &[u8], n: U128) -> bool {
+    assert!(check_caller() || is_valid_addr(acc, token_template_id));
+    assert!(check_witness(acc));
+    let token_id = oep8::generate_token(b"oep8", b"DToken", n, acc);
+    let key = get_key(PRE_TOKEN_ID, token_id.as_slice());
+    database::put(key.as_slice(), token_id.as_slice());
+    EventBuilder::new()
+        .string("generate_token")
+        .address(acc)
+        .bytearray(token_template_id)
+        .number(n)
+        .bytearray(token_id.as_slice())
+        .notify();
+    true
+}
+
+fn get_key(pre: &[u8], post: &[u8]) -> Vec<u8> {
     [pre, post].concat()
 }
 fn get_next_tt_id() -> U128 {
     database::get::<_, U128>(KEY_TT_ID).unwrap_or(0)
+}
+fn update_next_tt_id(new_id: U128) {
+    database::put(KEY_TT_ID, new_id)
 }
 
 /// use token, the buyer of the token has the right to consume the token
@@ -387,10 +440,11 @@ pub fn remove_token_agents(
     true
 }
 
-fn check_caller() {
+fn check_caller() -> bool {
     let caller = runtime::caller();
     let ddxf = get_mp_contract();
     assert!(caller == ddxf);
+    true
 }
 
 fn get_count_and_agent(account: &Address, token_template_bytes: &[u8]) -> CountAndAgent {

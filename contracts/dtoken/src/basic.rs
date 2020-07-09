@@ -2,6 +2,18 @@ use super::ostd::abi::{Decoder, Encoder, Error, Sink, Source};
 use super::ostd::types::{Address, U128};
 use super::BTreeMap;
 
+#[derive(Encoder, Decoder)]
+pub struct TokenTemplateInfo {
+    pub creator: Address,
+    pub tt: Vec<u8>,
+}
+
+impl TokenTemplateInfo {
+    pub fn new(creator: Address, tt: Vec<u8>) -> Self {
+        TokenTemplateInfo { creator, tt }
+    }
+}
+
 #[derive(Clone)]
 pub struct CountAndAgent {
     pub count: u32,
