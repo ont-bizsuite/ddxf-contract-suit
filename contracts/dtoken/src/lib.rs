@@ -10,6 +10,7 @@ use ostd::prelude::*;
 use ostd::runtime;
 use ostd::types::{Address, U128};
 mod basic;
+use crate::oep8::TrMulParam;
 use crate::utils::generate_agent_key;
 use basic::*;
 use common::CONTRACT_COMMON;
@@ -95,6 +96,13 @@ pub fn generate_dtoken(acc: &Address, token_template_id: &[u8], n: U128) -> bool
     true
 }
 
+pub fn generate_dtoken_multi(acc: &Address, token_template_ids: &[Vec<u8>], n: U128) -> bool {
+    for token_template_id in token_template_ids.iter() {
+        assert!(generate_dtoken(acc, token_template_id, n));
+    }
+    true
+}
+
 fn get_token_template(token_template_id: &[u8]) -> TokenTemplate {
     let info = database::get::<_, TokenTemplateInfo>(get_key(PRE_TT, token_template_id)).unwrap();
     TokenTemplate::from_bytes(info.tt.as_slice())
@@ -118,10 +126,22 @@ pub fn create_token_template(creator: &Address, tt_bs: &[u8]) -> bool {
     true
 }
 
-pub fn authorize_token_template(token_template_id: &[u8], authorized_addr: &Address) -> bool {
+pub fn verify_creator_sig(token_template_id: &[u8]) -> bool {
     let tt_info = database::get::<_, TokenTemplateInfo>(get_key(PRE_TT, token_template_id))
         .expect("not existed token template");
     assert!(check_witness(&tt_info.creator));
+    true
+}
+
+pub fn verify_creator_sig_multi(token_template_ids: &[Vec<u8>]) -> bool {
+    for token_template_id in token_template_ids.iter() {
+        assert!(verify_creator_sig(token_template_id));
+    }
+    true
+}
+
+pub fn authorize_token_template(token_template_id: &[u8], authorized_addr: &Address) -> bool {
+    assert!(verify_creator_sig(token_template_id));
     let mut addrs = get_authorized_addr(token_template_id);
     let index = addrs.iter().position(|x| x == authorized_addr);
     if index.is_none() {
@@ -394,6 +414,25 @@ pub fn remove_token_agents(account: &Address, token_id: &[u8], agents: &[Address
     true
 }
 
+fn transfer_dtoken_multi(
+    from: &Address,
+    to: &Address,
+    token_template_ids: &[Vec<u8>],
+    n: U128,
+) -> bool {
+    for token_template_id in token_template_ids.iter() {
+        let token_id = get_token_id_by_template_id(token_template_id);
+        assert!(oep8::transfer(from, to, token_id.as_slice(), n));
+    }
+    true
+}
+
+fn transfer_dtoken(from: &Address, to: &Address, token_template_id: &[u8], n: U128) -> bool {
+    let token_id = get_token_id_by_template_id(token_template_id);
+    assert!(oep8::transfer(from, to, token_id.as_slice(), n));
+    true
+}
+
 fn check_caller() -> bool {
     let caller = runtime::caller();
     let ddxf = get_mp_contract();
@@ -435,6 +474,14 @@ pub fn invoke() {
             let (creator, token_template_bs) = source.read().unwrap();
             sink.write(create_token_template(creator, token_template_bs));
         }
+        b"verifyCreatorSig" => {
+            let token_template_id = source.read().unwrap();
+            sink.write(verify_creator_sig(token_template_id));
+        }
+        b"verifyCreatorSigMulti" => {
+            let token_template_ids = source.read().unwrap();
+            sink.write(verify_creator_sig_multi(token_template_ids));
+        }
         b"authorizeTokenTemplate" => {
             let (token_template_id, authorized_addr) = source.read().unwrap();
             sink.write(authorize_token_template(token_template_id, authorized_addr));
@@ -454,6 +501,10 @@ pub fn invoke() {
         b"generateDToken" => {
             let (account, token_template_id, n) = source.read().unwrap();
             sink.write(generate_dtoken(account, token_template_id, n));
+        }
+        b"generateDTokenMulti" => {
+            let (account, token_template_ids, n) = source.read().unwrap();
+            sink.write(generate_dtoken_multi(account, token_template_ids, n));
         }
         b"deleteToken" => {
             let (account, token_id) = source.read().unwrap();
@@ -497,10 +548,22 @@ pub fn invoke() {
                 source.read().unwrap();
             sink.write(remove_token_agents(account, token_id, agents.as_slice()));
         }
+        b"transferDTokenMulti" => {
+            let (from, to, token_template_ids, n) = source.read().unwrap();
+            sink.write(transfer_dtoken_multi(from, to, token_template_ids, n));
+        }
+        b"transferDToken" => {
+            let (from, to, token_template_ids, n) = source.read().unwrap();
+            sink.write(transfer_dtoken(from, to, token_template_ids, n));
+        }
         //************************oep8 method*********************
         b"transfer" => {
             let (from, to, token_id, n) = source.read().unwrap();
             sink.write(oep8::transfer(from, to, token_id, n));
+        }
+        b"transferMulti" => {
+            let param: &[TrMulParam] = source.read().unwrap();
+            sink.write(oep8::transfer_multi(param));
         }
         b"name" => {
             let token_id = source.read().unwrap();

@@ -49,7 +49,7 @@ fn dtoken_test() {
         },
         expired_date: 10000,
         sold: 1000,
-        token_templates: vec![TokenTemplate::new(None, vec![vec![1u8; 32]])],
+        token_template_ids: vec![TokenTemplate::new(None, vec![vec![1u8; 32]])],
     };
 
     let mut sink = Sink::new(16);
@@ -179,7 +179,7 @@ fn publish() {
         fee,
         expired_date: 1,
         sold: 1,
-        token_templates: templates,
+        token_template_ids: templates,
     };
 
     let handle = build_runtime();
