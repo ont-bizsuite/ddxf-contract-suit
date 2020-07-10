@@ -2,6 +2,7 @@ use super::check_witness;
 use super::ostd::abi::EventBuilder;
 use super::ostd::abi::{Decoder, Encoder, Error, Sink, Source};
 use super::ostd::database;
+use super::ostd::prelude::*;
 use super::ostd::types::{Address, U128};
 
 pub struct TrMulParam<'a> {
@@ -125,11 +126,23 @@ pub fn balance_of(acct: &Address, id: &[u8]) -> U128 {
     database::get::<_, U128>(gen_balance_key(id, acct.as_ref())).unwrap_or(0)
 }
 
+pub fn destroy_token(acct: &Address, id: &[u8], n: U128) {
+    let key = gen_balance_key(id, acct.as_ref());
+    let ba = database::get::<_, U128>(key.as_slice()).unwrap_or(0);
+    assert!(ba >= n);
+    if ba == n {
+        database::delete(key.as_slice());
+    } else {
+        database::put(key.as_slice(), ba - n);
+    }
+}
+
 pub fn balances_of(acct: &Address) -> Vec<Balance> {
     let id = get_next_id();
     let mut res: Vec<Balance> = vec![];
     for i in 0..id {
-        let i_bs = i.to_string().as_bytes().to_vec();
+        let id_str = i.to_string();
+        let i_bs = id_str.as_bytes().to_vec();
         let ba = balance_of(acct, i_bs.as_slice());
         if ba > 0 {
             res.push(Balance { id: i_bs, amt: ba });
@@ -151,6 +164,14 @@ pub fn generate_token(name: &[u8], symbol: &[u8], supply: U128, admin: &Address)
         .bytearray(token_id.as_bytes())
         .notify();
     token_id.as_bytes().to_vec()
+}
+
+pub fn delete_token(token_id: &[u8]) {
+    database::delete(gen_key(PRE_NAME, token_id));
+    database::delete(gen_key(PRE_SYMBOL, token_id));
+    database::delete(gen_key(PRE_SUPPLY, token_id));
+    //TODO
+    //    database::delete(gen_balance_key(token_id, admin.as_ref()));
 }
 
 pub fn transfer(from: &Address, to: &Address, id: &[u8], amt: u128) -> bool {

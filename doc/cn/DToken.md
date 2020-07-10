@@ -60,7 +60,9 @@ pub fn generate_token(acc:&Address, token_template_id:&[u8], n:U128) -> bool
 * 校验 `acc`签名
 * `n` 发行的Token的总量
 * 该接口会生成`TokenId`,会通过Event推送出去, 客户端需要监听该event
-* 存储设计 `token_template_id -> token_id`
+* 存储设计 
+`token_template_id --> token_id`
+`token_id --> token_template_id`
 
 Event设计:
 ```

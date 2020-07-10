@@ -1,7 +1,6 @@
 #![cfg_attr(not(feature = "mock"), no_std)]
 #![feature(proc_macro_hygiene)]
 extern crate ontio_std as ostd;
-use core::cmp::{Eq, Ord, PartialEq, PartialOrd};
 use core::option::Option;
 use ontio_std::abi::EventBuilder;
 use ostd::abi::{Decoder, Encoder, Error, Sink, Source};
@@ -30,11 +29,13 @@ impl OrderId {
     }
 }
 
-#[derive(Clone, Debug, Ord, Eq, PartialEq, PartialOrd, Encoder, Decoder)]
+#[derive(Clone, Encoder, Decoder)]
 pub struct TokenTemplate {
     pub data_id: Option<Vec<u8>>,
     pub token_hash: Vec<Vec<u8>>,
     pub endpoint: Vec<u8>,
+    pub token_name: Vec<u8>,
+    pub token_symbol: Vec<u8>,
 }
 
 impl TokenTemplate {
@@ -51,11 +52,19 @@ impl TokenTemplate {
 }
 
 impl TokenTemplate {
-    pub fn new(data_id: Option<Vec<u8>>, token_hash: Vec<Vec<u8>>, endpoint: Vec<u8>) -> Self {
+    pub fn new(
+        token_name: Vec<u8>,
+        token_symbol: Vec<u8>,
+        data_id: Option<Vec<u8>>,
+        token_hash: Vec<Vec<u8>>,
+        endpoint: Vec<u8>,
+    ) -> Self {
         TokenTemplate {
             data_id,
             token_hash,
             endpoint,
+            token_name,
+            token_symbol,
         }
     }
 }
