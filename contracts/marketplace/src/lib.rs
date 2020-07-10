@@ -274,7 +274,7 @@ pub fn buy_dtoken_from_reseller(
     assert!(transfer_fee(
         &oi,
         buyer_account,
-        item_info.resource_ddo.mp_contract_address,
+        item_info.resource_ddo.accountant_contract_address,
         &item_info
             .resource_ddo
             .split_policy_contract_address
@@ -369,7 +369,7 @@ pub fn buy_dtoken(resource_id: &[u8], n: U128, buyer_account: &Address, payer: &
     assert!(transfer_fee(
         &oi,
         payer,
-        item_info.resource_ddo.mp_contract_address.clone(),
+        item_info.resource_ddo.accountant_contract_address.clone(),
         &item_info
             .resource_ddo
             .split_policy_contract_address
@@ -448,7 +448,7 @@ pub fn buy_dtoken_reward(
     assert!(transfer_fee(
         &oi,
         payer,
-        item_info.resource_ddo.mp_contract_address.clone(),
+        item_info.resource_ddo.accountant_contract_address.clone(),
         &item_info
             .resource_ddo
             .split_policy_contract_address
@@ -495,14 +495,14 @@ pub fn buy_dtoken_reward(
 fn transfer_fee(
     oi: &OrderId,
     buyer_account: &Address,
-    mp_contract_address: Option<Address>,
+    accountant_contract_address: Option<Address>,
     split_contract_address: &Address,
     fee: Fee,
     n: U128,
 ) -> bool {
-    let res = match mp_contract_address {
-        Some(mp_addr) => wasm::call_contract(
-            &mp_addr,
+    let res = match accountant_contract_address {
+        Some(accountant_addr) => wasm::call_contract(
+            &accountant_addr,
             (
                 "transferAmount",
                 (oi.to_bytes(), buyer_account, split_contract_address, fee, n),

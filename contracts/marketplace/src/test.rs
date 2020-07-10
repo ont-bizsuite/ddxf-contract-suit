@@ -135,7 +135,7 @@ fn serialize() {
         manager: manager.clone(),
         item_meta_hash: h,
         dtoken_contract_address: Some(dtoken_contract.clone()),
-        mp_contract_address: None,
+        accountant_contract_address: None,
         split_policy_contract_address: None,
     };
 
@@ -157,7 +157,7 @@ fn publish() {
         item_meta_hash: H256::repeat_byte(1),
         manager: manager.clone(),
         dtoken_contract_address: Some(dtoken_contract_address.clone()),
-        mp_contract_address: None,
+        accountant_contract_address: None,
         split_policy_contract_address: None,
     };
 
