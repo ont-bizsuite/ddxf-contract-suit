@@ -75,7 +75,8 @@ fn get_admin() -> Address {
 ///
 /// `n` represents the number of generate tokens
 pub fn generate_dtoken(acc: &Address, token_template_id: &[u8], n: U128) -> bool {
-    assert!(check_caller() || is_valid_addr(acc, token_template_id));
+    let caller = runtime::caller();
+    assert!(is_valid_addr(&[&caller, acc], token_template_id));
     assert!(check_witness(acc));
     let tt = get_token_template(token_template_id);
     let token_id =
@@ -147,6 +148,11 @@ pub fn authorize_token_template(token_template_id: &[u8], authorized_addr: &Addr
         let key = get_key(PRE_AUTHORIZED, token_template_id);
         database::put(key.as_slice(), addrs);
     }
+    EventBuilder::new()
+        .string("authorizeTokenTemplate")
+        .bytearray(token_template_id)
+        .address(authorized_addr)
+        .notify();
     true
 }
 
@@ -165,16 +171,19 @@ fn get_authorized_addr(token_template_id: &[u8]) -> Vec<Address> {
     database::get::<_, Vec<Address>>(key.as_slice()).unwrap_or(vec![])
 }
 
-fn is_valid_addr(acc: &Address, token_template_id: &[u8]) -> bool {
+fn is_valid_addr(acc: &[&Address], token_template_id: &[u8]) -> bool {
     let tt_info = database::get::<_, TokenTemplateInfo>(get_key(PRE_TT, token_template_id))
         .expect("not existed token template");
-    if &tt_info.creator == acc {
+    let ind = acc.iter().position(|&x| x == &tt_info.creator);
+    if ind.is_some() {
         return true;
     } else {
         let addrs = get_authorized_addr(token_template_id);
-        let index = addrs.iter().position(|x| x == acc);
-        if index.is_some() {
-            return true;
+        for addr in addrs.iter() {
+            let ind = acc.iter().position(|&x| x == addr);
+            if ind.is_some() {
+                return true;
+            }
         }
     }
     false
@@ -441,16 +450,6 @@ fn transfer_dtoken(from: &Address, to: &Address, token_template_id: &[u8], n: U1
     true
 }
 
-fn check_caller() -> bool {
-    let caller = runtime::caller();
-    let ddxf = get_mp_contract();
-    if caller == ddxf {
-        true
-    } else {
-        false
-    }
-}
-
 #[no_mangle]
 pub fn invoke() {
     let input = runtime::input();
@@ -598,6 +597,10 @@ pub fn invoke() {
         b"symbol" => {
             let token_id = source.read().unwrap();
             sink.write(oep8::symbol(token_id));
+        }
+        b"balanceOf" => {
+            let (addr, token_id) = source.read().unwrap();
+            sink.write(oep8::balance_of(addr, token_id));
         }
         _ => {
             let method = str::from_utf8(action).ok().unwrap();
