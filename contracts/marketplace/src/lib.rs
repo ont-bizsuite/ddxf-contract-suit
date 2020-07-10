@@ -26,7 +26,7 @@ mod dtoken;
 use common::*;
 use dtoken::*;
 use ostd::contract::wasm;
-use ostd::runtime::{check_witness, current_txhash};
+use ostd::runtime::{address, check_witness, current_txhash};
 
 #[cfg(test)]
 mod test;
@@ -41,7 +41,9 @@ const KEY_ADMIN: &[u8] = b"05";
 
 const DEFAULT_SPLIT_CONTRACT: Address = ostd::macros::base58!("ANzKSQWm7gLvJGrnMok2hoLQAoiLmuC5wq");
 const DEFAULT_DTOKEN_CONTRACT: Address =
-    ostd::macros::base58!("AQJzHbcT9pti1zzV2cRZ92B1i1z8QNN2n6");
+    ostd::macros::base58!("Aeth97vqFY51c5SziJWPT7zbU6ExtFXcKs");
+// dtoken testnet Aeth97vqFY51c5SziJWPT7zbU6ExtFXcKs
+// dtoken mainnet AQJzHbcT9pti1zzV2cRZ92B1i1z8QNN2n6
 
 /// set dtoken contract address as the default dtoken contract address,
 /// marketplace contract will invoke dtoken contract to pay the fee
@@ -182,6 +184,12 @@ pub fn dtoken_seller_publish_inner(
                 dtokens.get(i).unwrap(),
                 item.token_template_ids.get(i).unwrap()
             ));
+            let self_addr = address();
+            assert!(auth_token_template(
+                dtokens.get(i).unwrap(),
+                item.token_template_ids.get(i).unwrap(),
+                &self_addr,
+            ));
         }
     } else {
         let dtoken = get_dtoken_contract();
@@ -189,7 +197,14 @@ pub fn dtoken_seller_publish_inner(
             &dtoken,
             item.token_template_ids.as_slice()
         ));
+        let self_addr = address();
+        assert!(auth_token_template_multi(
+            &dtoken,
+            item.token_template_ids.as_slice(),
+            &self_addr,
+        ));
     }
+
     let seller = SellerItemInfo::new(item.clone(), resource_ddo.clone());
     database::put(utils::generate_seller_item_info_key(resource_id), seller);
 

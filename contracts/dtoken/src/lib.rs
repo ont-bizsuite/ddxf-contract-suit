@@ -14,7 +14,7 @@ use crate::oep8::TrMulParam;
 use crate::utils::generate_agent_key;
 use basic::*;
 use common::CONTRACT_COMMON;
-use ostd::runtime::{address, check_witness};
+use ostd::runtime::check_witness;
 
 mod oep8;
 
@@ -24,10 +24,8 @@ mod test;
 #[cfg(test)]
 mod oep8_test;
 
-const KEY_DTOKEN: &[u8] = b"01";
 const KEY_DDXF_CONTRACT: &[u8] = b"02";
 const KEY_ADMIN: &[u8] = b"03";
-const PRE_ID: &[u8] = b"04";
 const KEY_TT_ID: &[u8] = b"05";
 const PRE_TT: &[u8] = b"06";
 const PRE_AUTHORIZED: &[u8] = b"07";
@@ -47,7 +45,7 @@ fn set_mp_contract(new_addr: &Address) -> bool {
 
 /// query marketplace contract address
 fn get_mp_contract() -> Address {
-    database::get(KEY_DDXF_CONTRACT).unwrap()
+    database::get(KEY_DDXF_CONTRACT).unwrap_or(Address::new([0u8; 20]))
 }
 
 /// update admin address
@@ -87,7 +85,7 @@ pub fn generate_dtoken(acc: &Address, token_template_id: &[u8], n: U128) -> bool
     let key = get_key(PRE_TEMPLATE_ID, token_id.as_slice());
     database::put(key.as_slice(), token_template_id);
     EventBuilder::new()
-        .string("generate_token")
+        .string("generate_dtoken")
         .address(acc)
         .bytearray(token_template_id)
         .number(n)
@@ -148,6 +146,16 @@ pub fn authorize_token_template(token_template_id: &[u8], authorized_addr: &Addr
         addrs.push(*authorized_addr);
         let key = get_key(PRE_AUTHORIZED, token_template_id);
         database::put(key.as_slice(), addrs);
+    }
+    true
+}
+
+pub fn authorize_token_template_multi(
+    token_template_ids: &[Vec<u8>],
+    authorized_addr: &Address,
+) -> bool {
+    for token_template_id in token_template_ids.iter() {
+        assert!(authorize_token_template(token_template_id, authorized_addr));
     }
     true
 }
@@ -469,7 +477,6 @@ pub fn invoke() {
             let (code, vm_type, name, version, author, email, desc) = source.read().unwrap();
             sink.write(CONTRACT_COMMON.migrate(code, vm_type, name, version, author, email, desc));
         }
-        //**************************jwtToken method**********************
         b"createTokenTemplate" => {
             let (creator, token_template_bs) = source.read().unwrap();
             sink.write(create_token_template(creator, token_template_bs));
@@ -479,12 +486,20 @@ pub fn invoke() {
             sink.write(verify_creator_sig(token_template_id));
         }
         b"verifyCreatorSigMulti" => {
-            let token_template_ids = source.read().unwrap();
-            sink.write(verify_creator_sig_multi(token_template_ids));
+            let token_template_ids: Vec<Vec<u8>> = source.read().unwrap();
+            sink.write(verify_creator_sig_multi(token_template_ids.as_slice()));
         }
         b"authorizeTokenTemplate" => {
             let (token_template_id, authorized_addr) = source.read().unwrap();
             sink.write(authorize_token_template(token_template_id, authorized_addr));
+        }
+        b"authorizeTokenTemplateMulti" => {
+            let (token_template_ids, authorized_addr): (Vec<Vec<u8>>, &Address) =
+                source.read().unwrap();
+            sink.write(authorize_token_template_multi(
+                token_template_ids.as_slice(),
+                authorized_addr,
+            ));
         }
         b"getAuthorizedAddr" => {
             let token_template_id = source.read().unwrap();
@@ -503,8 +518,13 @@ pub fn invoke() {
             sink.write(generate_dtoken(account, token_template_id, n));
         }
         b"generateDTokenMulti" => {
-            let (account, token_template_ids, n) = source.read().unwrap();
-            sink.write(generate_dtoken_multi(account, token_template_ids, n));
+            let (account, token_template_ids, n): (&Address, Vec<Vec<u8>>, U128) =
+                source.read().unwrap();
+            sink.write(generate_dtoken_multi(
+                account,
+                token_template_ids.as_slice(),
+                n,
+            ));
         }
         b"deleteToken" => {
             let (account, token_id) = source.read().unwrap();
@@ -549,8 +569,14 @@ pub fn invoke() {
             sink.write(remove_token_agents(account, token_id, agents.as_slice()));
         }
         b"transferDTokenMulti" => {
-            let (from, to, token_template_ids, n) = source.read().unwrap();
-            sink.write(transfer_dtoken_multi(from, to, token_template_ids, n));
+            let (from, to, token_template_ids, n): (&Address, &Address, Vec<Vec<u8>>, U128) =
+                source.read().unwrap();
+            sink.write(transfer_dtoken_multi(
+                from,
+                to,
+                token_template_ids.as_slice(),
+                n,
+            ));
         }
         b"transferDToken" => {
             let (from, to, token_template_ids, n) = source.read().unwrap();
@@ -562,8 +588,8 @@ pub fn invoke() {
             sink.write(oep8::transfer(from, to, token_id, n));
         }
         b"transferMulti" => {
-            let param: &[TrMulParam] = source.read().unwrap();
-            sink.write(oep8::transfer_multi(param));
+            let param: Vec<TrMulParam> = source.read().unwrap();
+            sink.write(oep8::transfer_multi(param.as_slice()));
         }
         b"name" => {
             let token_id = source.read().unwrap();
@@ -583,10 +609,6 @@ pub fn invoke() {
 
 mod utils {
     use super::*;
-    use alloc::vec::Vec;
-    pub fn generate_dtoken_key(account: &Address, token_id: &[u8]) -> Vec<u8> {
-        [KEY_DTOKEN, account.as_ref(), token_id].concat()
-    }
     pub fn generate_agent_key(sink: &mut Sink, agent: &Address, token_id: &[u8]) {
         sink.write(PRE_AGENT);
         sink.write(agent);

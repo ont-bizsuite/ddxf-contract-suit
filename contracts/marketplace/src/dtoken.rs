@@ -18,6 +18,36 @@ pub fn verify_creator_sig(dtoken: &Address, token_template_id: &[u8]) -> bool {
     true
 }
 
+pub fn auth_token_template_multi(
+    dtoken: &Address,
+    token_template_ids: &[Vec<u8>],
+    authorized_addr: &Address,
+) -> bool {
+    verify_result(wasm::call_contract(
+        dtoken,
+        (
+            "authorizeTokenTemplateMulti",
+            (token_template_ids, authorized_addr),
+        ),
+    ));
+    true
+}
+
+pub fn auth_token_template(
+    dtoken: &Address,
+    token_template_id: &[u8],
+    authorized_addr: &Address,
+) -> bool {
+    verify_result(wasm::call_contract(
+        dtoken,
+        (
+            "authorizeTokenTemplate",
+            (token_template_id, authorized_addr),
+        ),
+    ));
+    true
+}
+
 pub fn transfer_dtoken(
     contract_address: &Address,
     from_account: &Address,
