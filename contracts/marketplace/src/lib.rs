@@ -359,7 +359,6 @@ pub fn buy_dtoken(resource_id: &[u8], n: U128, buyer_account: &Address, payer: &
             .unwrap();
     let now = runtime::timestamp();
     assert!(now < item_info.item.expired_date);
-
     assert!(item_info.item.sold < item_info.item.stocks);
     item_info.item.sold = n.checked_add(item_info.item.sold as U128).unwrap() as u32;
     assert!(item_info.item.sold <= item_info.item.stocks);

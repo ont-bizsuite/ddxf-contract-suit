@@ -419,11 +419,11 @@ pub fn invoke() {
         b"getAdmin" => {
             sink.write(get_admin());
         }
-        b"setDdxfContract" => {
+        b"setMpContract" => {
             let new_addr = source.read().unwrap();
             sink.write(set_mp_contract(new_addr));
         }
-        b"getDdxfContract" => {
+        b"getMpContract" => {
             sink.write(get_mp_contract());
         }
         b"migrate" => {
@@ -439,7 +439,7 @@ pub fn invoke() {
             let (token_template_id, authorized_addr) = source.read().unwrap();
             sink.write(authorize_token_template(token_template_id, authorized_addr));
         }
-        b"get_authorized_addr" => {
+        b"getAuthorizedAddr" => {
             let token_template_id = source.read().unwrap();
             sink.write(get_authorized_addr(token_template_id));
         }
@@ -452,8 +452,8 @@ pub fn invoke() {
             sink.write(get_template_id_by_token_id(token_id));
         }
         b"generateDToken" => {
-            let (account, templates, n) = source.read().unwrap();
-            sink.write(generate_dtoken(account, templates, n));
+            let (account, token_template_id, n) = source.read().unwrap();
+            sink.write(generate_dtoken(account, token_template_id, n));
         }
         b"deleteToken" => {
             let (account, token_id) = source.read().unwrap();
