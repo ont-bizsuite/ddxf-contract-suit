@@ -1,4 +1,6 @@
-cd ./contracts/data_id
+#cd ./contracts/dtoken
+cd ./contracts/marketplace
+#cd ./contracts/openkg
 
 cargo build --release --target=wasm32-unknown-unknown
 

@@ -68,7 +68,7 @@ pub fn buy_use_token(
     n: U128,
     buyer_account: &Address,
     payer: &Address,
-    token_template_bytes: &[u8],
+    token_template_id: &[u8],
 ) -> bool {
     //call market place
     let mp = get_mp_contract_addr();
@@ -81,10 +81,7 @@ pub fn buy_use_token(
     let dtoken = get_dtoken_contract_addr();
     verify_result(wasm::call_contract(
         &dtoken,
-        (
-            "useToken",
-            (resource_id, buyer_account, token_template_bytes, n),
-        ),
+        ("useToken", (buyer_account, token_template_id, n)),
     ));
     true
 }
@@ -94,7 +91,7 @@ pub fn buy_reward_and_use_token(
     n: U128,
     buyer_account: &Address,
     payer: &Address,
-    token_template_bytes: &[u8],
+    token_template_id: &[u8],
 ) -> bool {
     //call market place
     let mp = get_mp_contract_addr();
@@ -107,10 +104,7 @@ pub fn buy_reward_and_use_token(
     let dtoken = get_dtoken_contract_addr();
     verify_result(wasm::call_contract(
         &dtoken,
-        (
-            "useToken",
-            (resource_id, buyer_account, token_template_bytes, n),
-        ),
+        ("useToken", (buyer_account, token_template_id, n)),
     ));
     true
 }
@@ -120,8 +114,8 @@ fn buy_dtokens_and_set_agents(
     ns: Vec<U128>,
     use_index: U128,
     authorized_index: U128,
-    authorized_token_template_bytes: &[u8],
-    use_template_bytes: &[u8],
+    authorized_token_template_ids: &[u8],
+    use_template_id: &[u8],
     buyer_account: &Address,
     payer: &Address,
     agent: &Address,
@@ -144,7 +138,7 @@ fn buy_dtokens_and_set_agents(
                 resource_ids[authorized_index as usize],
                 buyer_account,
                 vec![agent.clone()],
-                authorized_token_template_bytes,
+                authorized_token_template_ids,
                 ns[authorized_index as usize],
             ),
         ),
@@ -156,7 +150,7 @@ fn buy_dtokens_and_set_agents(
             (
                 resource_ids[use_index as usize],
                 buyer_account,
-                use_template_bytes,
+                use_template_id,
                 ns[use_index as usize],
             ),
         ),
@@ -205,14 +199,13 @@ fn invoke() {
             ));
         }
         b"buyAndUseToken" => {
-            let (resource_id, n, buyer_account, payer, token_template_bytes) =
-                source.read().unwrap();
+            let (resource_id, n, buyer_account, payer, token_template_id) = source.read().unwrap();
             sink.write(buy_use_token(
                 resource_id,
                 n,
                 buyer_account,
                 payer,
-                token_template_bytes,
+                token_template_id,
             ));
         }
         b"buyDtokensAndSetAgents" => {

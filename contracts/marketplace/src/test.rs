@@ -49,7 +49,7 @@ fn dtoken_test() {
         },
         expired_date: 10000,
         sold: 1000,
-        token_templates: vec![TokenTemplate::new(None, vec![vec![1u8; 32]])],
+        token_template_ids: vec![TokenTemplate::new(None, vec![vec![1u8; 32]])],
     };
 
     let mut sink = Sink::new(16);
@@ -133,10 +133,9 @@ fn serialize() {
     let h = H256::repeat_byte(1);
     let ddo = ResourceDDO {
         manager: manager.clone(),
-        token_resource_ty_endpoints: vec![],
         item_meta_hash: h,
         dtoken_contract_address: Some(dtoken_contract.clone()),
-        mp_contract_address: None,
+        accountant_contract_address: None,
         split_policy_contract_address: None,
     };
 
@@ -155,11 +154,10 @@ fn publish() {
     let mp_contract_address = Address::repeat_byte(3);
 
     let ddo = ResourceDDO {
-        token_resource_ty_endpoints: vec![],
         item_meta_hash: H256::repeat_byte(1),
         manager: manager.clone(),
         dtoken_contract_address: Some(dtoken_contract_address.clone()),
-        mp_contract_address: None,
+        accountant_contract_address: None,
         split_policy_contract_address: None,
     };
 
@@ -181,7 +179,7 @@ fn publish() {
         fee,
         expired_date: 1,
         sold: 1,
-        token_templates: templates,
+        token_template_ids: templates,
     };
 
     let handle = build_runtime();

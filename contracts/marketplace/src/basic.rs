@@ -1,14 +1,14 @@
 use super::ostd::abi::{Decoder, Encoder, Sink, Source};
 use super::ostd::prelude::*;
 use super::ostd::types::{Address, H256};
-use common::{Fee, TokenTemplate};
+use common::Fee;
 
 #[derive(Clone, Encoder, Decoder)]
 pub struct ResourceDDO {
     pub manager: Address, // data owner
     pub item_meta_hash: H256,
     pub dtoken_contract_address: Option<Vec<Address>>, // can be empty
-    pub mp_contract_address: Option<Address>,          // can be empty
+    pub accountant_contract_address: Option<Address>,  // can be empty
     pub split_policy_contract_address: Option<Address>, //can be empty
 }
 
@@ -43,13 +43,13 @@ pub struct DTokenItem {
     pub expired_date: u64,
     pub stocks: u32,
     pub sold: u32,
-    pub token_templates: Vec<TokenTemplate>,
+    pub token_template_ids: Vec<Vec<u8>>,
 }
 
 impl DTokenItem {
     pub fn get_templates_bytes(&self) -> Vec<u8> {
         let mut sink = Sink::new(16);
-        sink.write(&self.token_templates);
+        sink.write(&self.token_template_ids);
         sink.bytes().to_vec()
     }
 

@@ -1,0 +1,7 @@
+# 合约部署记录
+
+
+|合约|主网|测试网|
+|--:|--:|--:|
+|mp|e01d500ed0c1719b7750367ae59b4b2d308d1ceb|9d0203fc1c1a5019c53fdf62ae3232f5a72f5d80|
+|dtoken|466b94488bf2ad1b1eec0ae7e49e40708e71a35d|466b94488bf2ad1b1eec0ae7e49e40708e71a35d|
