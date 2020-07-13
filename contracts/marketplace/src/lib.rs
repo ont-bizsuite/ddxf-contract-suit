@@ -173,6 +173,8 @@ pub fn dtoken_seller_publish_inner(
         database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id));
     if is_publish {
         assert!(resource.is_none());
+    } else {
+        assert!(resource.is_some());
     }
     assert_ne!(item.token_template_ids.len(), 0);
 
