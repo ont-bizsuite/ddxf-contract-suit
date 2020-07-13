@@ -171,11 +171,15 @@ pub fn delete_token(token_id: &[u8]) {
     database::delete(gen_key(PRE_SYMBOL, token_id));
     database::delete(gen_key(PRE_SUPPLY, token_id));
     //TODO
-    //    database::delete(gen_balance_key(token_id, admin.as_ref()));
+    // database::delete(gen_balance_key(token_id, admin.as_ref()));
 }
 
 pub fn transfer(from: &Address, to: &Address, id: &[u8], amt: u128) -> bool {
     assert!(check_witness(from));
+    transfer_inner(from, to, id, amt)
+}
+
+pub fn transfer_inner(from: &Address, to: &Address, id: &[u8], amt: u128) -> bool {
     let from_ba = balance_of(from, id);
     assert!(from_ba >= amt);
     let from_ba = from_ba.checked_sub(amt).unwrap();

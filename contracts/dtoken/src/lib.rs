@@ -299,7 +299,7 @@ pub fn set_agents(
 ) -> bool {
     assert!(check_witness(account));
     for id in token_ids.iter() {
-        assert!(set_token_agents(account, id, agents.clone(), n));
+        assert!(set_token_agents_inner(account, id, agents.clone(), n));
     }
     true
 }
@@ -317,6 +317,15 @@ pub fn set_agents(
 /// `n` represents the number of authorized token
 pub fn set_token_agents(account: &Address, token_id: &[u8], agents: Vec<Address>, n: U128) -> bool {
     assert!(check_witness(account));
+    set_token_agents_inner(account, token_id, agents, n)
+}
+
+pub fn set_token_agents_inner(
+    account: &Address,
+    token_id: &[u8],
+    agents: Vec<Address>,
+    n: U128,
+) -> bool {
     let ba = oep8::balance_of(account, token_id);
     assert!(ba >= n);
     let mut sink = Sink::new(64);
@@ -356,7 +365,7 @@ pub fn add_agents(
 ) -> bool {
     assert!(check_witness(account));
     for id in token_ids.iter() {
-        assert!(add_token_agents(account, id, &agents, n));
+        assert!(add_token_agents_inner(account, id, &agents, n));
     }
     true
 }
@@ -374,6 +383,15 @@ pub fn add_agents(
 /// `n` is number of authorizations per agent
 pub fn add_token_agents(account: &Address, token_id: &[u8], agents: &[Address], n: U128) -> bool {
     assert!(check_witness(account));
+    add_token_agents_inner(account, token_id, agents, n)
+}
+
+pub fn add_token_agents_inner(
+    account: &Address,
+    token_id: &[u8],
+    agents: &[Address],
+    n: U128,
+) -> bool {
     let mut sink = Sink::new(64);
     for agent in agents.iter() {
         sink.clear();
@@ -402,7 +420,7 @@ pub fn add_token_agents(account: &Address, token_id: &[u8], agents: &[Address], 
 pub fn remove_agents(account: &Address, agents: Vec<Address>, token_ids: Vec<Vec<u8>>) -> bool {
     assert!(check_witness(account));
     for id in token_ids.iter() {
-        assert!(remove_token_agents(account, id, agents.as_slice()));
+        assert!(remove_token_agents_inner(account, id, agents.as_slice()));
     }
     true
 }
@@ -418,6 +436,10 @@ pub fn remove_agents(account: &Address, agents: Vec<Address>, token_ids: Vec<Vec
 /// `agents` is the array of agent address which will be removed by account
 pub fn remove_token_agents(account: &Address, token_id: &[u8], agents: &[Address]) -> bool {
     assert!(check_witness(account));
+    remove_token_agents_inner(account, token_id, agents)
+}
+
+pub fn remove_token_agents_inner(account: &Address, token_id: &[u8], agents: &[Address]) -> bool {
     let mut sink = Sink::new(64);
     for agent in agents.iter() {
         sink.clear();
@@ -437,9 +459,10 @@ fn transfer_dtoken_multi(
     token_template_ids: &[Vec<u8>],
     n: U128,
 ) -> bool {
+    assert!(check_witness(from));
     for token_template_id in token_template_ids.iter() {
         let token_id = get_token_id_by_template_id(token_template_id);
-        assert!(oep8::transfer(from, to, token_id.as_slice(), n));
+        assert!(oep8::transfer_inner(from, to, token_id.as_slice(), n));
     }
     true
 }
@@ -476,6 +499,7 @@ pub fn invoke() {
             let (code, vm_type, name, version, author, email, desc) = source.read().unwrap();
             sink.write(CONTRACT_COMMON.migrate(code, vm_type, name, version, author, email, desc));
         }
+        //*********************jwtToken method********************
         b"createTokenTemplate" => {
             let (creator, token_template_bs) = source.read().unwrap();
             sink.write(create_token_template(creator, token_template_bs));
