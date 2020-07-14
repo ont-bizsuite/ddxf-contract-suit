@@ -1,4 +1,4 @@
-use super::ostd::abi::{Decoder, Encoder, Sink, Source};
+use super::ostd::abi::{Decoder, Encoder, Source};
 use super::ostd::prelude::*;
 use super::ostd::types::{Address, H256};
 use common::Fee;
@@ -19,6 +19,7 @@ impl ResourceDDO {
     }
     #[cfg(test)]
     pub fn to_bytes(&self) -> Vec<u8> {
+        use super::ostd::abi::Sink;
         let mut sink = Sink::new(16);
         sink.write(self);
         sink.bytes().to_vec()
@@ -47,12 +48,6 @@ pub struct DTokenItem {
 }
 
 impl DTokenItem {
-    pub fn get_templates_bytes(&self) -> Vec<u8> {
-        let mut sink = Sink::new(16);
-        sink.write(&self.token_template_ids);
-        sink.bytes().to_vec()
-    }
-
     pub fn from_bytes(data: &[u8]) -> Self {
         let mut source = Source::new(data);
         source.read().unwrap()
@@ -60,6 +55,7 @@ impl DTokenItem {
 
     #[cfg(test)]
     pub fn to_bytes(&self) -> Vec<u8> {
+        use super::ostd::abi::Sink;
         let mut sink = Sink::new(16);
         sink.write(self);
         sink.bytes().to_vec()

@@ -23,10 +23,11 @@ use ostd::types::{Address, U128};
 mod basic;
 use basic::*;
 mod dtoken;
+mod split_policy;
 use common::*;
 use dtoken::*;
 use ostd::contract::wasm;
-use ostd::runtime::{address, check_witness, current_txhash};
+use ostd::runtime::{check_witness, current_txhash};
 
 #[cfg(test)]
 mod test;
@@ -168,7 +169,8 @@ pub fn dtoken_seller_publish_inner(
 ) -> bool {
     let resource_ddo = ResourceDDO::from_bytes(resource_ddo_bytes);
     let item = DTokenItem::from_bytes(item_bytes);
-    assert!(runtime::check_witness(&resource_ddo.manager));
+    let admin = get_admin();
+    assert!(runtime::check_witness(&resource_ddo.manager) && runtime::check_witness(&admin));
     let resource =
         database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id));
     if is_publish {
@@ -179,52 +181,24 @@ pub fn dtoken_seller_publish_inner(
     assert_ne!(item.token_template_ids.len(), 0);
 
     //verify token_template_id creator sig
-    if let Some(dtokens) = resource_ddo.dtoken_contract_address.as_ref() {
-        let l = dtokens.len();
-        for i in 0..l {
-            assert!(verify_creator_sig(
-                dtokens.get(i).unwrap(),
-                item.token_template_ids.get(i).unwrap()
-            ));
-            let self_addr = address();
-            assert!(auth_token_template(
-                dtokens.get(i).unwrap(),
-                item.token_template_ids.get(i).unwrap(),
-                &self_addr,
-            ));
-        }
-    } else {
-        let dtoken = get_dtoken_contract();
-        assert!(verify_creator_sig_multi(
-            &dtoken,
-            item.token_template_ids.as_slice()
-        ));
-        let self_addr = address();
-        assert!(auth_token_template_multi(
-            &dtoken,
-            item.token_template_ids.as_slice(),
-            &self_addr,
-        ));
-    }
+    // authorize mp address
+    verify_auth(
+        &resource_ddo.dtoken_contract_address,
+        item.token_template_ids.as_slice(),
+    );
 
     let seller = SellerItemInfo::new(item.clone(), resource_ddo.clone());
     database::put(utils::generate_seller_item_info_key(resource_id), seller);
 
     //invoke split_policy contract
     let split_addr = get_split_policy_contract();
-    let res = wasm::call_contract(
+    assert!(split_policy::register(
         &resource_ddo
             .split_policy_contract_address
             .unwrap_or(split_addr),
-        ("register", (resource_id, split_policy_param_bytes)),
-    );
-    if let Some(r) = res {
-        let mut source = Source::new(r.as_slice());
-        let rr: bool = source.read().unwrap();
-        assert!(rr);
-    } else {
-        panic!("call split contract register failed");
-    }
+        resource_id,
+        split_policy_param_bytes
+    ));
 
     //event
     let mut method = "dtokenSellerPublish";
@@ -259,7 +233,8 @@ fn delete(resource_id: &[u8]) -> bool {
     let item_info =
         database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
             .unwrap();
-    assert!(check_witness(&item_info.resource_ddo.manager));
+    let admin = get_admin();
+    assert!(check_witness(&item_info.resource_ddo.manager) || check_witness(&admin));
     database::delete(utils::generate_seller_item_info_key(resource_id));
     EventBuilder::new()
         .string("delete")
@@ -315,31 +290,16 @@ pub fn buy_dtoken_from_reseller(
         item_info.item.fee.clone(),
         n
     ));
-    if let Some(d) = item_info.resource_ddo.dtoken_contract_address {
-        let l = d.len();
-        for i in 0..l {
-            let token_template_id = item_info.item.token_template_ids.get(i).unwrap();
-            assert!(transfer_dtoken(
-                d.get(i).unwrap(),
-                reseller_account,
-                buyer_account,
-                token_template_id,
-                n
-            ));
-        }
-    } else {
-        let dtoken = get_dtoken_contract();
-        //TODO
-        assert!(transfer_dtoken_multi(
-            &dtoken,
-            reseller_account,
-            buyer_account,
-            item_info.item.token_template_ids.as_slice(),
-            n
-        ));
-    }
+
+    transfer_dtoken(
+        &item_info.resource_ddo.dtoken_contract_address,
+        item_info.item.token_template_ids.as_slice(),
+        reseller_account,
+        buyer_account,
+        n,
+    );
     EventBuilder::new()
-        .string("buyDtokenFromReseller")
+        .string("buyDTokenFromReseller")
         .bytearray(resource_id)
         .number(n)
         .address(buyer_account)
@@ -389,8 +349,8 @@ pub fn buy_dtoken(resource_id: &[u8], n: U128, buyer_account: &Address, payer: &
         database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
             .unwrap();
     let now = runtime::timestamp();
-    assert!(now < item_info.item.expired_date);
-    assert!(item_info.item.sold < item_info.item.stocks);
+    assert!(now <= item_info.item.expired_date);
+    assert!(item_info.item.sold <= item_info.item.stocks);
     item_info.item.sold = n.checked_add(item_info.item.sold as U128).unwrap() as u32;
     assert!(item_info.item.sold <= item_info.item.stocks);
     let oi = OrderId {
@@ -412,29 +372,15 @@ pub fn buy_dtoken(resource_id: &[u8], n: U128, buyer_account: &Address, payer: &
         utils::generate_seller_item_info_key(resource_id),
         &item_info,
     );
-    if let Some(dtoken_addr) = item_info.resource_ddo.dtoken_contract_address {
-        let l = dtoken_addr.len();
-        for i in 0..l {
-            let mut sink = Sink::new(64);
-            sink.write(vec![item_info.item.token_template_ids.get(i)]);
-            assert!(generate_dtoken(
-                &dtoken_addr[i],
-                buyer_account,
-                sink.bytes(),
-                n
-            ));
-        }
-    } else {
-        let dtoken = get_dtoken_contract();
-        assert!(generate_dtoken_multi(
-            &dtoken,
-            buyer_account,
-            &item_info.item.token_template_ids,
-            n
-        ));
-    }
+    //TODO
+    generate_dtoken(
+        &item_info.resource_ddo.dtoken_contract_address,
+        item_info.item.token_template_ids.as_slice(),
+        buyer_account,
+        n,
+    );
     EventBuilder::new()
-        .string("buyDtoken")
+        .string("buyDToken")
         .bytearray(resource_id)
         .number(n)
         .address(buyer_account)
@@ -491,29 +437,14 @@ pub fn buy_dtoken_reward(
         utils::generate_seller_item_info_key(resource_id),
         &item_info,
     );
-    if let Some(dtoken_addr) = item_info.resource_ddo.dtoken_contract_address {
-        let l = dtoken_addr.len();
-        for i in 0..l {
-            let mut sink = Sink::new(64);
-            sink.write(vec![item_info.item.token_template_ids.get(i)]);
-            assert!(generate_dtoken(
-                &dtoken_addr[i],
-                buyer_account,
-                sink.bytes(),
-                n
-            ));
-        }
-    } else {
-        let dtoken = get_dtoken_contract();
-        assert!(generate_dtoken(
-            &dtoken,
-            buyer_account,
-            &item_info.item.get_templates_bytes(),
-            n
-        ));
-    }
+    generate_dtoken(
+        &item_info.resource_ddo.dtoken_contract_address,
+        item_info.item.token_template_ids.as_slice(),
+        buyer_account,
+        n,
+    );
     EventBuilder::new()
-        .string("buyDtoken")
+        .string("buyDTokenReward")
         .bytearray(resource_id)
         .number(n)
         .address(buyer_account)
@@ -626,7 +557,7 @@ pub fn invoke() {
             let resource_id = source.read().unwrap();
             sink.write(get_seller_item_info(resource_id))
         }
-        b"buyDtokenFromReseller" => {
+        b"buyDTokenFromReseller" => {
             let (resource_id, n, buyer_account, reseller_account) = source.read().unwrap();
             sink.write(buy_dtoken_from_reseller(
                 resource_id,
@@ -635,15 +566,15 @@ pub fn invoke() {
                 reseller_account,
             ));
         }
-        b"buyDtokens" => {
+        b"buyDTokens" => {
             let (resource_ids, ns, buyer, payer) = source.read().unwrap();
             sink.write(buy_dtokens(resource_ids, ns, buyer, payer));
         }
-        b"buyDtoken" => {
+        b"buyDToken" => {
             let (resource_id, n, buyer_account, payer) = source.read().unwrap();
             sink.write(buy_dtoken(resource_id, n, buyer_account, payer));
         }
-        b"buyDtokenReward" => {
+        b"buyDTokenReward" => {
             let (resource_id, n, buyer_account, payer, unit_price) = source.read().unwrap();
             sink.write(buy_dtoken_reward(
                 resource_id,

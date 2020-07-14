@@ -86,7 +86,7 @@ pub fn generate_dtoken(acc: &Address, token_template_id: &[u8], n: U128) -> bool
     let key = get_key(PRE_TEMPLATE_ID, token_id.as_slice());
     database::put(key.as_slice(), token_template_id);
     EventBuilder::new()
-        .string("generate_dtoken")
+        .string("generateDToken")
         .address(acc)
         .bytearray(token_template_id)
         .number(n)
@@ -117,7 +117,7 @@ pub fn create_token_template(creator: &Address, tt_bs: &[u8]) -> bool {
     );
     update_next_tt_id(tt_id + 1);
     EventBuilder::new()
-        .string("create_token_template")
+        .string("createTokenTemplate")
         .address(creator)
         .bytearray(tt_bs)
         .bytearray(tt_id_str.as_bytes())
@@ -139,26 +139,29 @@ pub fn verify_creator_sig_multi(token_template_ids: &[Vec<u8>]) -> bool {
     true
 }
 
-pub fn authorize_token_template(token_template_id: &[u8], authorized_addr: &Address) -> bool {
+pub fn authorize_token_template(token_template_id: &[u8], authorized_addr: &[Address]) -> bool {
     assert!(verify_creator_sig(token_template_id));
     let mut addrs = get_authorized_addr(token_template_id);
-    let index = addrs.iter().position(|x| x == authorized_addr);
-    if index.is_none() {
-        addrs.push(*authorized_addr);
-        let key = get_key(PRE_AUTHORIZED, token_template_id);
-        database::put(key.as_slice(), addrs);
+    for addr in authorized_addr.iter() {
+        for add in addrs.iter() {
+            if add == addr {
+                continue;
+            }
+        }
+        addrs.push(addr.clone());
     }
+    let key = get_key(PRE_AUTHORIZED, token_template_id);
+    database::put(key.as_slice(), addrs);
     EventBuilder::new()
         .string("authorizeTokenTemplate")
         .bytearray(token_template_id)
-        .address(authorized_addr)
         .notify();
     true
 }
 
 pub fn authorize_token_template_multi(
     token_template_ids: &[Vec<u8>],
-    authorized_addr: &Address,
+    authorized_addr: &[Address],
 ) -> bool {
     for token_template_id in token_template_ids.iter() {
         assert!(authorize_token_template(token_template_id, authorized_addr));
@@ -522,11 +525,11 @@ pub fn invoke() {
             sink.write(authorize_token_template(token_template_id, authorized_addr));
         }
         b"authorizeTokenTemplateMulti" => {
-            let (token_template_ids, authorized_addr): (Vec<Vec<u8>>, &Address) =
+            let (token_template_ids, authorized_addr): (Vec<Vec<u8>>, Vec<Address>) =
                 source.read().unwrap();
             sink.write(authorize_token_template_multi(
                 token_template_ids.as_slice(),
-                authorized_addr,
+                authorized_addr.as_slice(),
             ));
         }
         b"getAuthorizedAddr" => {
@@ -592,7 +595,8 @@ pub fn invoke() {
             sink.write(remove_agents(account, agents, token_ids));
         }
         b"removeTokenAgents" => {
-            let (account, token_id, agents): (&Address, &[u8], Vec<Address>) = source.read().unwrap();
+            let (account, token_id, agents): (&Address, &[u8], Vec<Address>) =
+                source.read().unwrap();
             sink.write(remove_token_agents(account, token_id, agents.as_slice()));
         }
         //**************************mp invoke*************************
