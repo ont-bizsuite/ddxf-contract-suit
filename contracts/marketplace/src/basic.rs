@@ -42,8 +42,8 @@ impl SellerItemInfo {
 pub struct DTokenItem {
     pub fee: Fee,
     pub expired_date: u64,
-    pub stocks: u32,
-    pub sold: u32,
+    pub stocks: u64,
+    pub sold: u64,
     pub token_template_ids: Vec<Vec<u8>>,
 }
 

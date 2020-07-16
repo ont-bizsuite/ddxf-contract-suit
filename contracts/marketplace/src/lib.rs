@@ -161,7 +161,7 @@ pub fn dtoken_seller_publish(
 }
 
 pub fn dtoken_seller_publish_inner(
-    resource_id: &[u8],
+    item_id: &[u8],
     resource_ddo_bytes: &[u8],
     item_bytes: &[u8],
     split_policy_param_bytes: &[u8],
@@ -172,7 +172,7 @@ pub fn dtoken_seller_publish_inner(
     let admin = get_admin();
     assert!(runtime::check_witness(&resource_ddo.manager) && runtime::check_witness(&admin));
     let resource =
-        database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id));
+        database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(item_id));
     if is_publish {
         assert!(resource.is_none());
     } else {
@@ -188,7 +188,7 @@ pub fn dtoken_seller_publish_inner(
     );
 
     let seller = SellerItemInfo::new(item.clone(), resource_ddo.clone());
-    database::put(utils::generate_seller_item_info_key(resource_id), seller);
+    database::put(utils::generate_seller_item_info_key(item_id), seller);
 
     //invoke split_policy contract
     let split_addr = get_split_policy_contract();
@@ -196,7 +196,7 @@ pub fn dtoken_seller_publish_inner(
         &resource_ddo
             .split_policy_contract_address
             .unwrap_or(split_addr),
-        resource_id,
+        item_id,
         split_policy_param_bytes
     ));
 
@@ -207,7 +207,7 @@ pub fn dtoken_seller_publish_inner(
     }
     EventBuilder::new()
         .string(method)
-        .bytearray(resource_id)
+        .bytearray(item_id)
         .bytearray(resource_ddo_bytes)
         .bytearray(item_bytes)
         .notify();
@@ -351,7 +351,7 @@ pub fn buy_dtoken(resource_id: &[u8], n: U128, buyer_account: &Address, payer: &
     let now = runtime::timestamp();
     assert!(now <= item_info.item.expired_date);
     assert!(item_info.item.sold <= item_info.item.stocks);
-    item_info.item.sold = n.checked_add(item_info.item.sold as U128).unwrap() as u32;
+    item_info.item.sold = n.checked_add(item_info.item.sold as U128).unwrap() as u64;
     assert!(item_info.item.sold <= item_info.item.stocks);
     let oi = OrderId {
         item_id: resource_id.to_vec(),
@@ -414,7 +414,7 @@ pub fn buy_dtoken_reward(
     assert!(now < item_info.item.expired_date);
 
     assert!(item_info.item.sold < item_info.item.stocks);
-    item_info.item.sold = n.checked_add(item_info.item.sold as U128).unwrap() as u32;
+    item_info.item.sold = n.checked_add(item_info.item.sold as U128).unwrap() as u64;
     assert!(item_info.item.sold <= item_info.item.stocks);
     let oi = OrderId {
         item_id: resource_id.to_vec(),

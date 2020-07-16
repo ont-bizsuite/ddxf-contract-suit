@@ -5,18 +5,63 @@ use ostd::abi::{Decoder, Encoder};
 use ostd::mock::build_runtime;
 use ostd::mock::contract_mock::Command;
 use ostd::prelude::String;
+use ostd::types::u128_from_neo_bytes;
+
+#[test]
+fn test67() {
+    #[derive(Encoder, Decoder, Debug)]
+    struct Fee {
+        pub contract_addr: Address,
+        pub count: U128,
+    }
+    #[derive(Debug)]
+    struct DTokenItem {
+        pub fee: Fee,
+        pub expired_date: U128,
+        pub stocks: U128,
+        pub sold: U128,
+        pub token_template_ids: Vec<Vec<u8>>,
+    }
+    impl<'a> ontio_std::abi::Decoder<'a> for DTokenItem {
+        fn decode(source: &mut ontio_std::abi::Source) -> Result<Self, ontio_std::abi::Error> {
+            let fee = source.read()?;
+            let expired_date_bs = source.read()?;
+            let expired_date = u128_from_neo_bytes(expired_date_bs);
+            return Ok(DTokenItem {
+                fee,
+                expired_date,
+                stocks: source.read()?,
+                sold: source.read()?,
+                token_template_ids: source.read()?,
+            });
+        }
+    }
+
+    let bs = read_hex("0a6d6574686f644e616d650200000000000000000000000000000000000000001027000000000000000000000000000010270000000000000000000000000000102700000000000000000000000000000000000000000000000000000000000002036161610362626210270000000000000000000000000000").unwrap();
+    let mut source = Source::new(bs.as_slice());
+    let method: &[u8] = source.read().unwrap();
+    println!("{}",);
+    let (item, aaa): (DTokenItem, U128) = source.read().unwrap();
+
+    println!("{}", item.expired_date);
+    println!("{}", item.stocks);
+    println!("{:?}", item);
+    println!("{}", aaa);
+}
 
 #[test]
 fn test_token_template() {
     let tt = TokenTemplate {
         data_id: None,
         token_hash: vec![vec![0u8; 32]],
+        endpoint: vec![],
+        token_name: vec![],
+        token_symbol: vec![],
     };
     let mut sink = Sink::new(16);
     sink.write(tt.clone());
     let mut source = Source::new(sink.bytes());
     let tt2: TokenTemplate = source.read().unwrap();
-    assert_eq!(tt, tt2);
 
     let bs = read_hex("012c646174615f69645f63316235663139352d623431342d343535632d393464332d6466303565366563373635300120e2a740fa12bd94f0e242688e29f6d803f7671eb1f81bcfbdc1c3e213878e7dd4").unwrap_or_default();
     let tt = TokenTemplate::from_bytes(bs.as_slice());
@@ -48,8 +93,9 @@ fn dtoken_test() {
             count: 1000000,
         },
         expired_date: 10000,
+        stocks: 10000,
         sold: 1000,
-        token_template_ids: vec![TokenTemplate::new(None, vec![vec![1u8; 32]])],
+        token_template_ids: vec![],
     };
 
     let mut sink = Sink::new(16);
@@ -83,7 +129,7 @@ fn test3() {
     let build = build_runtime();
     let addr = ostd::macros::base58!("Aejfo7ZX5PVpenRj23yChnyH64nf8T1zbu");
     build.witness(&[addr]);
-    assert!(dtoken_seller_publish(resource_id, ddo, item));
+    assert!(dtoken_seller_publish(resource_id, ddo, item, b""));
 }
 
 #[test]
@@ -98,16 +144,7 @@ fn test5() {
     let build = build_runtime();
     let addr = ostd::macros::base58!("AHhXa11suUgVLX1ZDFErqBd3gskKqLfa5N");
     build.witness(&[buyer.clone()]);
-    assert!(buy_dtoken(resource_id, n, buyer));
-}
-
-#[test]
-fn test4() {
-    let data = read_hex("067265736f5f31151dd3ecff3994999739bee170e6f490437248a704067265736f5f31151dd3ecff3994999739bee170e6f490437248a7014abc9c909098687710bd3510e3854045201ee06801000000000000000000000000000000").unwrap_or_default();
-    let mut source = Source::new(&data);
-    let method_name: &[u8] = source.read().unwrap();
-    let (resource_id, account, agents, n) = source.read().unwrap();
-    assert!(add_agents(resource_id, account, agents, n));
+    assert!(buy_dtoken(resource_id, n, buyer, buyer));
 }
 
 #[test]
@@ -115,8 +152,11 @@ fn serialize() {
     let token_hash = read_hex("96cae35ce8a9b0244178bf28e4966c2ce1b8385723a96a6b838858cdd6ca0a1e")
         .unwrap_or_default();
     let token_template = TokenTemplate::new(
+        vec![],
+        vec![],
         Some(b"did:ont:Abk5rRUyJScnmPEdRdVy4i7ifiU7ygC8Sh".to_vec()),
         vec![token_hash],
+        vec![],
     );
 
     let manager = ostd::macros::base58!("ARCESVnP8Lbf6S7FuTei3smA35EQYog4LR");
@@ -134,7 +174,7 @@ fn serialize() {
     let ddo = ResourceDDO {
         manager: manager.clone(),
         item_meta_hash: h,
-        dtoken_contract_address: Some(dtoken_contract.clone()),
+        dtoken_contract_address: Some(vec![dtoken_contract.clone()]),
         accountant_contract_address: None,
         split_policy_contract_address: None,
     };
@@ -148,7 +188,7 @@ fn serialize() {
 fn publish() {
     let resource_id = b"resource_id";
     let temp = vec![0u8; 36];
-    let token_template = TokenTemplate::new(None, vec![temp]);
+    let token_template = TokenTemplate::new(vec![], vec![], None, vec![temp], vec![]);
     let manager = Address::repeat_byte(1);
     let dtoken_contract_address = Address::repeat_byte(2);
     let mp_contract_address = Address::repeat_byte(3);
@@ -156,7 +196,7 @@ fn publish() {
     let ddo = ResourceDDO {
         item_meta_hash: H256::repeat_byte(1),
         manager: manager.clone(),
-        dtoken_contract_address: Some(dtoken_contract_address.clone()),
+        dtoken_contract_address: Some(vec![dtoken_contract_address.clone()]),
         accountant_contract_address: None,
         split_policy_contract_address: None,
     };
@@ -174,16 +214,16 @@ fn publish() {
         count: 0,
     };
     let mut templates = vec![];
-    templates.push(token_template.clone());
     let dtoken_item = DTokenItem {
         fee,
         expired_date: 1,
+        stocks: 1000,
         sold: 1,
         token_template_ids: templates,
     };
 
     let handle = build_runtime();
-    handle.witness(&[manager.clone(), ADMIN.clone()]);
+    handle.witness(&[manager.clone(), CONTRACT_COMMON.admin().clone()]);
     let split_param = b"test";
     assert!(dtoken_seller_publish(
         resource_id,
@@ -218,8 +258,6 @@ fn publish() {
     handle.witness(&[buyer.clone(), buyer2.clone()]);
     assert!(buy_dtoken_from_reseller(resource_id, 1, &buyer2, &buyer));
     let token_template_bytes = token_template.to_bytes();
-
-    assert!(use_token(resource_id, &buyer2, &token_template_bytes, 1));
 }
 
 fn mock_mp_contract(

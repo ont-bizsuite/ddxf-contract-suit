@@ -1,6 +1,6 @@
 use super::ostd::types::Address;
 use super::*;
-use hexutil::to_hex;
+use hexutil::{read_hex, to_hex};
 use ostd::mock::build_runtime;
 
 #[test]
@@ -20,7 +20,7 @@ fn test_create_tt() {
     let authorized_addr = Address::repeat_byte(2);
     assert!(authorize_token_template(
         token_template_id,
-        &authorized_addr
+        &[authorized_addr.clone()]
     ));
     let addr = get_authorized_addr(token_template_id);
     assert_eq!(addr.len(), 1);
@@ -64,10 +64,23 @@ fn generate_dtoken_test() {
     assert!(set_mp_contract(&creator));
     assert!(create_token_template(&creator, template_bytes.as_slice()));
     let token_template_id = "0".to_string().as_bytes().to_vec();
+
+    let temp_acc = Address::repeat_byte(8);
     assert!(authorize_token_template(
         token_template_id.as_slice(),
-        &account
+        &[account.clone(), temp_acc.clone()]
     ));
+
+    let addrs = get_authorized_addr(token_template_id.as_slice());
+    assert_eq!(addrs.len(), 2);
+
+    assert!(remove_authorize_addr(
+        token_template_id.as_slice(),
+        &[temp_acc]
+    ));
+    let addrs = get_authorized_addr(token_template_id.as_slice());
+    assert_eq!(addrs.len(), 1);
+
     assert!(generate_dtoken(&account, token_template_id.as_slice(), n));
 
     let token_id = "0".to_string().as_bytes().to_vec();

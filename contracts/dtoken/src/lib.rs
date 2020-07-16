@@ -125,6 +125,32 @@ pub fn create_token_template(creator: &Address, tt_bs: &[u8]) -> bool {
     true
 }
 
+pub fn update_token_template(token_template_id: &[u8], tt_bs: &[u8]) -> bool {
+    let tt_info = database::get::<_, TokenTemplateInfo>(get_key(PRE_TT, token_template_id))
+        .expect("not existed token template");
+    assert!(check_witness(&tt_info.creator));
+    database::put(
+        get_key(PRE_TT, token_template_id),
+        TokenTemplateInfo::new(tt_info.creator, tt_bs.to_vec()),
+    );
+    EventBuilder::new()
+        .string("updateTokenTemplate")
+        .bytearray(token_template_id)
+        .bytearray(tt_bs)
+        .notify();
+    true
+}
+
+pub fn remove_token_template(token_template_id: &[u8]) -> bool {
+    assert!(verify_creator_sig(token_template_id));
+    database::delete(get_key(PRE_TT, token_template_id));
+    EventBuilder::new()
+        .string("removeTokenTemplate")
+        .bytearray(token_template_id)
+        .notify();
+    true
+}
+
 pub fn verify_creator_sig(token_template_id: &[u8]) -> bool {
     let tt_info = database::get::<_, TokenTemplateInfo>(get_key(PRE_TT, token_template_id))
         .expect("not existed token template");
@@ -154,6 +180,24 @@ pub fn authorize_token_template(token_template_id: &[u8], authorized_addr: &[Add
     database::put(key.as_slice(), addrs);
     EventBuilder::new()
         .string("authorizeTokenTemplate")
+        .bytearray(token_template_id)
+        .notify();
+    true
+}
+
+pub fn remove_authorize_addr(token_template_id: &[u8], authorized_addr: &[Address]) -> bool {
+    assert!(verify_creator_sig(token_template_id));
+    let mut addrs = get_authorized_addr(token_template_id);
+    for addr in authorized_addr.iter() {
+        let index = addrs.iter().position(|x| x == addr);
+        if let Some(ind) = index {
+            addrs.remove(ind);
+        }
+    }
+    let key = get_key(PRE_AUTHORIZED, token_template_id);
+    database::put(key.as_slice(), addrs);
+    EventBuilder::new()
+        .string("removeAuthorizeAddr")
         .bytearray(token_template_id)
         .notify();
     true
@@ -512,6 +556,14 @@ pub fn invoke() {
             let (creator, token_template_bs) = source.read().unwrap();
             sink.write(create_token_template(creator, token_template_bs));
         }
+        b"updateTokenTemplate" => {
+            let (token_template_id, token_template_bs) = source.read().unwrap();
+            sink.write(update_token_template(token_template_id, token_template_bs));
+        }
+        b"removeTokenTemplate" => {
+            let token_template_id = source.read().unwrap();
+            sink.write(remove_token_template(token_template_id));
+        }
         b"verifyCreatorSig" => {
             let token_template_id = source.read().unwrap();
             sink.write(verify_creator_sig(token_template_id));
@@ -521,8 +573,20 @@ pub fn invoke() {
             sink.write(verify_creator_sig_multi(token_template_ids.as_slice()));
         }
         b"authorizeTokenTemplate" => {
-            let (token_template_id, authorized_addr) = source.read().unwrap();
-            sink.write(authorize_token_template(token_template_id, authorized_addr));
+            let (token_template_id, authorized_addr): (&[u8], Vec<Address>) =
+                source.read().unwrap();
+            sink.write(authorize_token_template(
+                token_template_id,
+                authorized_addr.as_slice(),
+            ));
+        }
+        b"removeAuthorizeAddr" => {
+            let (token_template_id, authorized_addr): (&[u8], Vec<Address>) =
+                source.read().unwrap();
+            sink.write(remove_authorize_addr(
+                token_template_id,
+                authorized_addr.as_slice(),
+            ));
         }
         b"authorizeTokenTemplateMulti" => {
             let (token_template_ids, authorized_addr): (Vec<Vec<u8>>, Vec<Address>) =
