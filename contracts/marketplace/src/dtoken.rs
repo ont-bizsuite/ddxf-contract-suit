@@ -1,6 +1,8 @@
+use super::get_dtoken_contract;
 use super::ostd::contract::wasm;
 use super::ostd::prelude::*;
 use super::{verify_result, Address, U128};
+use ontio_std::runtime::address;
 
 pub fn verify_creator_sig_multi(dtoken: &Address, token_template_ids: &[Vec<u8>]) -> bool {
     verify_result(wasm::call_contract(
@@ -16,6 +18,33 @@ pub fn verify_creator_sig(dtoken: &Address, token_template_id: &[u8]) -> bool {
         ("verifyCreatorSig", (token_template_id,)),
     ));
     true
+}
+
+pub fn verify_auth(dtokens_contract_addr: &Option<Vec<Address>>, token_template_ids: &[Vec<u8>]) {
+    if let Some(dtokens) = dtokens_contract_addr {
+        let l = dtokens.len();
+        for i in 0..l {
+            assert!(verify_creator_sig(
+                dtokens.get(i).unwrap(),
+                token_template_ids.get(i).unwrap()
+            ));
+            let self_addr = address();
+            assert!(auth_token_template(
+                dtokens.get(i).unwrap(),
+                token_template_ids.get(i).unwrap(),
+                &self_addr,
+            ));
+        }
+    } else {
+        let dtoken = get_dtoken_contract();
+        assert!(verify_creator_sig_multi(&dtoken, token_template_ids));
+        let self_addr = address();
+        assert!(auth_token_template_multi(
+            &dtoken,
+            token_template_ids,
+            &self_addr,
+        ));
+    }
 }
 
 pub fn auth_token_template_multi(
@@ -49,6 +78,37 @@ pub fn auth_token_template(
 }
 
 pub fn transfer_dtoken(
+    dtokens: &Option<Vec<Address>>,
+    token_template_ids: &[Vec<u8>],
+    reseller_account: &Address,
+    buyer_account: &Address,
+    n: U128,
+) {
+    if let Some(d) = dtokens {
+        let l = d.len();
+        for i in 0..l {
+            let token_template_id = token_template_ids.get(i).unwrap();
+            assert!(transfer_dtoken_inner(
+                d.get(i).unwrap(),
+                reseller_account,
+                buyer_account,
+                token_template_id,
+                n
+            ));
+        }
+    } else {
+        let dtoken = get_dtoken_contract();
+        assert!(transfer_dtoken_multi(
+            &dtoken,
+            reseller_account,
+            buyer_account,
+            token_template_ids,
+            n
+        ));
+    }
+}
+
+fn transfer_dtoken_inner(
     contract_address: &Address,
     from_account: &Address,
     to_account: &Address,
@@ -58,14 +118,14 @@ pub fn transfer_dtoken(
     verify_result(wasm::call_contract(
         contract_address,
         (
-            "transferDtoken",
+            "transferDToken",
             (from_account, to_account, token_template_id, n),
         ),
     ));
     true
 }
 
-pub fn transfer_dtoken_multi(
+fn transfer_dtoken_multi(
     contract_address: &Address,
     from_account: &Address,
     to_account: &Address,
@@ -83,6 +143,32 @@ pub fn transfer_dtoken_multi(
 }
 
 pub fn generate_dtoken(
+    dtokens: &Option<Vec<Address>>,
+    token_template_ids: &[Vec<u8>],
+    buyer_account: &Address,
+    n: U128,
+) {
+    if let Some(dtoken_addr) = dtokens {
+        let l = dtoken_addr.len();
+        for i in 0..l {
+            assert!(generate_dtoken_inner(
+                &dtoken_addr[i],
+                buyer_account,
+                token_template_ids.get(i).unwrap(),
+                n
+            ));
+        }
+    } else {
+        let dtoken = get_dtoken_contract();
+        assert!(generate_dtoken_multi(
+            &dtoken,
+            buyer_account,
+            token_template_ids,
+            n
+        ));
+    }
+}
+fn generate_dtoken_inner(
     contract_address: &Address,
     account: &Address,
     token_template_id: &[u8],
@@ -95,7 +181,7 @@ pub fn generate_dtoken(
     true
 }
 
-pub fn generate_dtoken_multi(
+fn generate_dtoken_multi(
     contract_address: &Address,
     account: &Address,
     token_template_ids: &[Vec<u8>],

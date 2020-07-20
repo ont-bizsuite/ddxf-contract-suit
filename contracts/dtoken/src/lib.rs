@@ -86,7 +86,7 @@ pub fn generate_dtoken(acc: &Address, token_template_id: &[u8], n: U128) -> bool
     let key = get_key(PRE_TEMPLATE_ID, token_id.as_slice());
     database::put(key.as_slice(), token_template_id);
     EventBuilder::new()
-        .string("generate_dtoken")
+        .string("generateDToken")
         .address(acc)
         .bytearray(token_template_id)
         .number(n)
@@ -117,10 +117,36 @@ pub fn create_token_template(creator: &Address, tt_bs: &[u8]) -> bool {
     );
     update_next_tt_id(tt_id + 1);
     EventBuilder::new()
-        .string("create_token_template")
+        .string("createTokenTemplate")
         .address(creator)
         .bytearray(tt_bs)
         .bytearray(tt_id_str.as_bytes())
+        .notify();
+    true
+}
+
+pub fn update_token_template(token_template_id: &[u8], tt_bs: &[u8]) -> bool {
+    let tt_info = database::get::<_, TokenTemplateInfo>(get_key(PRE_TT, token_template_id))
+        .expect("not existed token template");
+    assert!(check_witness(&tt_info.creator));
+    database::put(
+        get_key(PRE_TT, token_template_id),
+        TokenTemplateInfo::new(tt_info.creator, tt_bs.to_vec()),
+    );
+    EventBuilder::new()
+        .string("updateTokenTemplate")
+        .bytearray(token_template_id)
+        .bytearray(tt_bs)
+        .notify();
+    true
+}
+
+pub fn remove_token_template(token_template_id: &[u8]) -> bool {
+    assert!(verify_creator_sig(token_template_id));
+    database::delete(get_key(PRE_TT, token_template_id));
+    EventBuilder::new()
+        .string("removeTokenTemplate")
+        .bytearray(token_template_id)
         .notify();
     true
 }
@@ -139,26 +165,47 @@ pub fn verify_creator_sig_multi(token_template_ids: &[Vec<u8>]) -> bool {
     true
 }
 
-pub fn authorize_token_template(token_template_id: &[u8], authorized_addr: &Address) -> bool {
+pub fn authorize_token_template(token_template_id: &[u8], authorized_addr: &[Address]) -> bool {
     assert!(verify_creator_sig(token_template_id));
     let mut addrs = get_authorized_addr(token_template_id);
-    let index = addrs.iter().position(|x| x == authorized_addr);
-    if index.is_none() {
-        addrs.push(*authorized_addr);
-        let key = get_key(PRE_AUTHORIZED, token_template_id);
-        database::put(key.as_slice(), addrs);
+    for addr in authorized_addr.iter() {
+        for add in addrs.iter() {
+            if add == addr {
+                continue;
+            }
+        }
+        addrs.push(addr.clone());
     }
+    let key = get_key(PRE_AUTHORIZED, token_template_id);
+    database::put(key.as_slice(), addrs);
     EventBuilder::new()
         .string("authorizeTokenTemplate")
         .bytearray(token_template_id)
-        .address(authorized_addr)
+        .notify();
+    true
+}
+
+pub fn remove_authorize_addr(token_template_id: &[u8], authorized_addr: &[Address]) -> bool {
+    assert!(verify_creator_sig(token_template_id));
+    let mut addrs = get_authorized_addr(token_template_id);
+    for addr in authorized_addr.iter() {
+        let index = addrs.iter().position(|x| x == addr);
+        if let Some(ind) = index {
+            addrs.remove(ind);
+        }
+    }
+    let key = get_key(PRE_AUTHORIZED, token_template_id);
+    database::put(key.as_slice(), addrs);
+    EventBuilder::new()
+        .string("removeAuthorizeAddr")
+        .bytearray(token_template_id)
         .notify();
     true
 }
 
 pub fn authorize_token_template_multi(
     token_template_ids: &[Vec<u8>],
-    authorized_addr: &Address,
+    authorized_addr: &[Address],
 ) -> bool {
     for token_template_id in token_template_ids.iter() {
         assert!(authorize_token_template(token_template_id, authorized_addr));
@@ -218,32 +265,31 @@ fn update_next_tt_id(new_id: U128) {
 /// `token_template_bytes` used to mark the only token
 ///
 /// `n` represents the number of consuming token
-pub fn use_token(account: &Address, token_template_id: &[u8], n: U128) -> bool {
+pub fn use_token(account: &Address, token_id: &[u8], n: U128) -> bool {
     assert!(check_witness(account));
-    let token_id = get_token_id_by_template_id(token_template_id);
-    let ba = oep8::balance_of(account, token_id.as_slice());
+    let ba = oep8::balance_of(account, token_id);
     assert!(ba >= n);
-    oep8::destroy_token(account, token_id.as_slice(), n);
+    oep8::destroy_token(account, token_id, n);
     EventBuilder::new()
         .string("useToken")
         .address(account)
-        .bytearray(token_template_id)
+        .bytearray(token_id)
         .number(n)
         .notify();
     true
 }
 
-fn delete_token(account: &Address, token_template_id: &[u8]) -> bool {
+fn delete_token(account: &Address, token_id: &[u8]) -> bool {
     assert!(check_witness(account) || check_witness(CONTRACT_COMMON.admin()));
-    let token_id = get_token_id_by_template_id(token_template_id);
-    oep8::delete_token(token_id.as_slice());
-    let key = get_key(PRE_TT, token_template_id);
+    let template_id = get_template_id_by_token_id(token_id);
+    oep8::delete_token(token_id);
+    let key = get_key(PRE_TT, template_id.as_slice());
     database::delete(key.as_slice());
-    let key = get_key(PRE_TOKEN_ID, token_template_id);
+    let key = get_key(PRE_TOKEN_ID, template_id.as_slice());
     database::delete(key.as_slice());
-    let key = get_key(PRE_TEMPLATE_ID, token_id.as_slice());
+    let key = get_key(PRE_TEMPLATE_ID, token_id);
     database::delete(key.as_slice());
-    let key = get_key(PRE_AUTHORIZED, token_template_id);
+    let key = get_key(PRE_AUTHORIZED, template_id.as_slice());
     database::delete(key.as_slice());
     true
 }
@@ -259,18 +305,12 @@ fn delete_token(account: &Address, token_template_id: &[u8]) -> bool {
 /// `token_template_bytes` used to mark the only token
 ///
 /// `n` represents the number of consuming token
-pub fn use_token_by_agent(
-    account: &Address,
-    agent: &Address,
-    token_template_id: &[u8],
-    n: U128,
-) -> bool {
+pub fn use_token_by_agent(account: &Address, agent: &Address, token_id: &[u8], n: U128) -> bool {
     assert!(check_witness(agent));
-    let token_id = get_token_id_by_template_id(token_template_id);
-    let ba = oep8::balance_of(account, token_id.as_slice());
+    let ba = oep8::balance_of(account, token_id);
     assert!(ba >= n);
     let mut sink = Sink::new(64);
-    generate_agent_key(&mut sink, agent, token_id.as_slice());
+    generate_agent_key(&mut sink, agent, token_id);
     let agent_count = database::get::<_, U128>(sink.bytes()).unwrap_or(0);
     assert!(agent_count >= n);
     if agent_count == n {
@@ -279,11 +319,11 @@ pub fn use_token_by_agent(
         let agent_count = agent_count.checked_sub(n).unwrap();
         database::put(sink.bytes(), agent_count);
     }
-    oep8::destroy_token(account, token_id.as_slice(), n);
+    oep8::destroy_token(account, token_id, n);
     EventBuilder::new()
         .string("useTokenByAgent")
         .address(account)
-        .bytearray(token_template_id)
+        .bytearray(token_id)
         .number(n)
         .notify();
     true
@@ -304,10 +344,10 @@ pub fn set_agents(
     account: &Address,
     agents: Vec<Address>,
     n: U128,
-    token_template_ids: Vec<Vec<u8>>,
+    token_ids: Vec<Vec<u8>>,
 ) -> bool {
     assert!(check_witness(account));
-    for id in token_template_ids.iter() {
+    for id in token_ids.iter() {
         assert!(set_token_agents_inner(account, id, agents.clone(), n));
     }
     true
@@ -324,44 +364,37 @@ pub fn set_agents(
 /// `agents` is the array of address who will be authorized as agents
 ///
 /// `n` represents the number of authorized token
-pub fn set_token_agents(
-    account: &Address,
-    token_template_id: &[u8],
-    agents: Vec<Address>,
-    n: U128,
-) -> bool {
+pub fn set_token_agents(account: &Address, token_id: &[u8], agents: Vec<Address>, n: U128) -> bool {
     assert!(check_witness(account));
-    set_token_agents_inner(account, token_template_id, agents, n)
+    set_token_agents_inner(account, token_id, agents, n)
 }
 
 pub fn set_token_agents_inner(
     account: &Address,
-    token_template_id: &[u8],
+    token_id: &[u8],
     agents: Vec<Address>,
     n: U128,
 ) -> bool {
-    let token_id = get_token_id_by_template_id(token_template_id);
-    let ba = oep8::balance_of(account, token_id.as_slice());
+    let ba = oep8::balance_of(account, token_id);
     assert!(ba >= n);
     let mut sink = Sink::new(64);
     for agent in agents.iter() {
         sink.clear();
-        generate_agent_key(&mut sink, agent, token_id.as_slice());
+        generate_agent_key(&mut sink, agent, token_id);
         database::put(sink.bytes(), n);
     }
     EventBuilder::new()
         .string("setTokenAgents")
         .address(account)
-        .bytearray(token_template_id)
+        .bytearray(token_id)
         .number(n)
         .notify();
     true
 }
 
-fn get_agent_balance(agent: &Address, token_template_id: &[u8]) -> U128 {
-    let token_id = get_token_id_by_template_id(token_template_id);
+fn get_agent_balance(agent: &Address, token_id: &[u8]) -> U128 {
     let mut sink = Sink::new(64);
-    generate_agent_key(&mut sink, agent, token_id.as_slice());
+    generate_agent_key(&mut sink, agent, token_id);
     database::get::<_, U128>(sink.bytes()).unwrap_or(0)
 }
 
@@ -378,10 +411,10 @@ pub fn add_agents(
     account: &Address,
     agents: Vec<Address>,
     n: U128,
-    token_template_ids: Vec<Vec<u8>>,
+    token_ids: Vec<Vec<u8>>,
 ) -> bool {
     assert!(check_witness(account));
-    for id in token_template_ids.iter() {
+    for id in token_ids.iter() {
         assert!(add_token_agents_inner(account, id, &agents, n));
     }
     true
@@ -398,27 +431,21 @@ pub fn add_agents(
 /// `agents` is the array of agent address
 ///
 /// `n` is number of authorizations per agent
-pub fn add_token_agents(
-    account: &Address,
-    token_template_id: &[u8],
-    agents: &[Address],
-    n: U128,
-) -> bool {
+pub fn add_token_agents(account: &Address, token_id: &[u8], agents: &[Address], n: U128) -> bool {
     assert!(check_witness(account));
-    add_token_agents_inner(account, token_template_id, agents, n)
+    add_token_agents_inner(account, token_id, agents, n)
 }
 
 pub fn add_token_agents_inner(
     account: &Address,
-    token_template_id: &[u8],
+    token_id: &[u8],
     agents: &[Address],
     n: U128,
 ) -> bool {
-    let token_id = get_token_id_by_template_id(token_template_id);
     let mut sink = Sink::new(64);
     for agent in agents.iter() {
         sink.clear();
-        generate_agent_key(&mut sink, agent, token_id.as_slice());
+        generate_agent_key(&mut sink, agent, token_id);
         let ba = database::get::<_, U128>(sink.bytes()).unwrap_or(0);
         let ba = ba.checked_add(n).unwrap();
         database::put(sink.bytes(), ba);
@@ -426,6 +453,7 @@ pub fn add_token_agents_inner(
     EventBuilder::new()
         .string("addTokenAgents")
         .address(account)
+        .bytearray(token_id)
         .number(n)
         .notify();
     true
@@ -440,13 +468,9 @@ pub fn add_token_agents_inner(
 /// `agents` is the array of agent address which will be removed by account
 ///
 /// `token_templates_bytes` the serialization result is array of TokenTemplate
-pub fn remove_agents(
-    account: &Address,
-    agents: Vec<Address>,
-    token_template_ids: Vec<Vec<u8>>,
-) -> bool {
+pub fn remove_agents(account: &Address, agents: Vec<Address>, token_ids: Vec<Vec<u8>>) -> bool {
     assert!(check_witness(account));
-    for id in token_template_ids.iter() {
+    for id in token_ids.iter() {
         assert!(remove_token_agents_inner(account, id, agents.as_slice()));
     }
     true
@@ -461,30 +485,22 @@ pub fn remove_agents(
 /// `token_template_bytes` is the serialization result of
 ///
 /// `agents` is the array of agent address which will be removed by account
-pub fn remove_token_agents(
-    account: &Address,
-    token_template_id: &[u8],
-    agents: &[Address],
-) -> bool {
+pub fn remove_token_agents(account: &Address, token_id: &[u8], agents: &[Address]) -> bool {
     assert!(check_witness(account));
-    remove_token_agents_inner(account, token_template_id, agents)
+    remove_token_agents_inner(account, token_id, agents)
 }
 
-pub fn remove_token_agents_inner(
-    account: &Address,
-    token_template_id: &[u8],
-    agents: &[Address],
-) -> bool {
-    let token_id = get_token_id_by_template_id(token_template_id);
+pub fn remove_token_agents_inner(account: &Address, token_id: &[u8], agents: &[Address]) -> bool {
     let mut sink = Sink::new(64);
     for agent in agents.iter() {
         sink.clear();
-        generate_agent_key(&mut sink, agent, token_id.as_slice());
+        generate_agent_key(&mut sink, agent, token_id);
         database::delete(sink.bytes());
     }
     EventBuilder::new()
         .string("removeTokenAgents")
         .address(account)
+        .bytearray(token_id)
         .notify();
     true
 }
@@ -540,6 +556,14 @@ pub fn invoke() {
             let (creator, token_template_bs) = source.read().unwrap();
             sink.write(create_token_template(creator, token_template_bs));
         }
+        b"updateTokenTemplate" => {
+            let (token_template_id, token_template_bs) = source.read().unwrap();
+            sink.write(update_token_template(token_template_id, token_template_bs));
+        }
+        b"removeTokenTemplate" => {
+            let token_template_id = source.read().unwrap();
+            sink.write(remove_token_template(token_template_id));
+        }
         b"verifyCreatorSig" => {
             let token_template_id = source.read().unwrap();
             sink.write(verify_creator_sig(token_template_id));
@@ -549,15 +573,27 @@ pub fn invoke() {
             sink.write(verify_creator_sig_multi(token_template_ids.as_slice()));
         }
         b"authorizeTokenTemplate" => {
-            let (token_template_id, authorized_addr) = source.read().unwrap();
-            sink.write(authorize_token_template(token_template_id, authorized_addr));
+            let (token_template_id, authorized_addr): (&[u8], Vec<Address>) =
+                source.read().unwrap();
+            sink.write(authorize_token_template(
+                token_template_id,
+                authorized_addr.as_slice(),
+            ));
+        }
+        b"removeAuthorizeAddr" => {
+            let (token_template_id, authorized_addr): (&[u8], Vec<Address>) =
+                source.read().unwrap();
+            sink.write(remove_authorize_addr(
+                token_template_id,
+                authorized_addr.as_slice(),
+            ));
         }
         b"authorizeTokenTemplateMulti" => {
-            let (token_template_ids, authorized_addr): (Vec<Vec<u8>>, &Address) =
+            let (token_template_ids, authorized_addr): (Vec<Vec<u8>>, Vec<Address>) =
                 source.read().unwrap();
             sink.write(authorize_token_template_multi(
                 token_template_ids.as_slice(),
-                authorized_addr,
+                authorized_addr.as_slice(),
             ));
         }
         b"getAuthorizedAddr" => {
@@ -586,56 +622,48 @@ pub fn invoke() {
             ));
         }
         b"deleteToken" => {
-            let (account, token_template_id) = source.read().unwrap();
-            sink.write(delete_token(account, token_template_id));
+            let (account, token_id) = source.read().unwrap();
+            sink.write(delete_token(account, token_id));
         }
         b"getAgentBalance" => {
-            let (agent, token_template_id) = source.read().unwrap();
-            sink.write(get_agent_balance(agent, token_template_id));
+            let (agent, token_id) = source.read().unwrap();
+            sink.write(get_agent_balance(agent, token_id));
         }
         b"useToken" => {
-            let (account, token_template_id, n) = source.read().unwrap();
-            sink.write(use_token(account, token_template_id, n));
+            let (account, token_id, n) = source.read().unwrap();
+            sink.write(use_token(account, token_id, n));
         }
         b"useTokenByAgent" => {
-            let (account, agent, token_template_id, n) = source.read().unwrap();
-            sink.write(use_token_by_agent(account, agent, token_template_id, n));
+            let (account, agent, token_id, n) = source.read().unwrap();
+            sink.write(use_token_by_agent(account, agent, token_id, n));
         }
         b"setAgents" => {
-            let (account, agents, n, token_template_ids) = source.read().unwrap();
-            sink.write(set_agents(account, agents, n, token_template_ids));
+            let (account, agents, n, token_ids) = source.read().unwrap();
+            sink.write(set_agents(account, agents, n, token_ids));
         }
         b"setTokenAgents" => {
-            let (account, token_template_id, agents, n) = source.read().unwrap();
-            sink.write(set_token_agents(account, token_template_id, agents, n));
+            let (account, token_id, agents, n) = source.read().unwrap();
+            sink.write(set_token_agents(account, token_id, agents, n));
         }
         b"addAgents" => {
-            let (account, agents, n, token_template_ids) = source.read().unwrap();
-            sink.write(add_agents(account, agents, n, token_template_ids));
+            let (account, agents, n, token_ids) = source.read().unwrap();
+            sink.write(add_agents(account, agents, n, token_ids));
         }
         b"addTokenAgents" => {
-            let (account, token_template_id, agents, n): (&Address, &[u8], Vec<Address>, U128) =
+            let (account, token_id, agents, n): (&Address, &[u8], Vec<Address>, U128) =
                 source.read().unwrap();
-            sink.write(add_token_agents(
-                account,
-                token_template_id,
-                agents.as_slice(),
-                n,
-            ));
+            sink.write(add_token_agents(account, token_id, agents.as_slice(), n));
         }
         b"removeAgents" => {
-            let (account, agents, token_template_ids) = source.read().unwrap();
-            sink.write(remove_agents(account, agents, token_template_ids));
+            let (account, agents, token_ids) = source.read().unwrap();
+            sink.write(remove_agents(account, agents, token_ids));
         }
         b"removeTokenAgents" => {
-            let (account, token_template_id, agents): (&Address, &[u8], Vec<Address>) =
+            let (account, token_id, agents): (&Address, &[u8], Vec<Address>) =
                 source.read().unwrap();
-            sink.write(remove_token_agents(
-                account,
-                token_template_id,
-                agents.as_slice(),
-            ));
+            sink.write(remove_token_agents(account, token_id, agents.as_slice()));
         }
+        //**************************mp invoke*************************
         b"transferDTokenMulti" => {
             let (from, to, token_template_ids, n): (&Address, &Address, Vec<Vec<u8>>, U128) =
                 source.read().unwrap();
