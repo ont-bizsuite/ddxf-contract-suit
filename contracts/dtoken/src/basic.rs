@@ -5,11 +5,14 @@ use alloc::vec::Vec;
 #[derive(Encoder, Decoder)]
 pub struct TokenTemplateInfo {
     pub creator: Address,
-    pub tt: Vec<u8>,
+    pub token_template: Vec<u8>,
 }
 
 impl TokenTemplateInfo {
-    pub fn new(creator: Address, tt: Vec<u8>) -> Self {
-        TokenTemplateInfo { creator, tt }
+    pub fn new(creator: Address, token_template: Vec<u8>) -> Self {
+        TokenTemplateInfo {
+            creator,
+            token_template,
+        }
     }
 }

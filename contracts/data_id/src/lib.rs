@@ -10,6 +10,7 @@ use ostd::runtime::{input, ret};
 
 extern crate common;
 use common::CONTRACT_COMMON;
+use ontio_std::abi::EventBuilder;
 
 #[cfg(test)]
 mod test;
@@ -58,6 +59,10 @@ pub fn reg_id_add_attribute_array(reg_id_bytes: Vec<Vec<u8>>) -> bool {
             reg_id.signer.as_slice()
         ));
     }
+    EventBuilder::new()
+        .string("reg_id_add_attribute_array")
+        .number(reg_id_bytes.len() as U128)
+        .notify();
     true
 }
 
