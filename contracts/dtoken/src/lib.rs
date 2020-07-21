@@ -10,7 +10,7 @@ use ostd::prelude::*;
 use ostd::runtime;
 use ostd::types::{Address, U128};
 mod basic;
-use crate::oep8::TrMulParam;
+use crate::oep8::{AppMulParam, TrFromMulParam, TrMulParam};
 use crate::utils::generate_agent_key;
 use basic::*;
 use common::CONTRACT_COMMON;
@@ -78,7 +78,7 @@ pub fn generate_dtoken(acc: &Address, token_template_id: &[u8], n: U128) -> bool
     let caller = runtime::caller();
     assert!(is_valid_addr(&[&caller, acc], token_template_id));
     assert!(check_witness(acc));
-    let tt = get_token_template(token_template_id);
+    let tt = get_token_template(token_template_id).unwrap();
     let token_id =
         oep8::generate_token(tt.token_name.as_slice(), tt.token_symbol.as_slice(), n, acc);
     let key = get_key(PRE_TOKEN_ID, token_template_id);
@@ -102,9 +102,13 @@ pub fn generate_dtoken_multi(acc: &Address, token_template_ids: &[Vec<u8>], n: U
     true
 }
 
-fn get_token_template(token_template_id: &[u8]) -> TokenTemplate {
-    let info = database::get::<_, TokenTemplateInfo>(get_key(PRE_TT, token_template_id)).unwrap();
-    TokenTemplate::from_bytes(info.tt.as_slice())
+fn get_token_template(token_template_id: &[u8]) -> Option<TokenTemplate> {
+    let info = database::get::<_, TokenTemplateInfo>(get_key(PRE_TT, token_template_id));
+    if let Some(data) = info {
+        Some(TokenTemplate::from_bytes(data.token_template.as_slice()))
+    } else {
+        None
+    }
 }
 
 pub fn create_token_template(creator: &Address, tt_bs: &[u8]) -> bool {
@@ -343,12 +347,17 @@ pub fn use_token_by_agent(account: &Address, agent: &Address, token_id: &[u8], n
 pub fn set_agents(
     account: &Address,
     agents: Vec<Address>,
-    n: U128,
+    n: Vec<U128>,
     token_ids: Vec<Vec<u8>>,
 ) -> bool {
     assert!(check_witness(account));
     for id in token_ids.iter() {
-        assert!(set_token_agents_inner(account, id, agents.clone(), n));
+        assert!(set_token_agents_inner(
+            account,
+            id,
+            agents.as_slice(),
+            n.as_slice()
+        ));
     }
     true
 }
@@ -364,31 +373,39 @@ pub fn set_agents(
 /// `agents` is the array of address who will be authorized as agents
 ///
 /// `n` represents the number of authorized token
-pub fn set_token_agents(account: &Address, token_id: &[u8], agents: Vec<Address>, n: U128) -> bool {
+pub fn set_token_agents(
+    account: &Address,
+    token_id: &[u8],
+    agents: Vec<Address>,
+    n: Vec<U128>,
+) -> bool {
     assert!(check_witness(account));
-    set_token_agents_inner(account, token_id, agents, n)
+    set_token_agents_inner(account, token_id, agents.as_slice(), n.as_slice())
 }
 
 pub fn set_token_agents_inner(
     account: &Address,
     token_id: &[u8],
-    agents: Vec<Address>,
-    n: U128,
+    agents: &[Address],
+    n: &[U128],
 ) -> bool {
     let ba = oep8::balance_of(account, token_id);
-    assert!(ba >= n);
+    let sum = n.iter().fold(0, |sum, &x| sum + x);
+    assert!(ba >= sum);
     let mut sink = Sink::new(64);
-    for agent in agents.iter() {
+    let l = agents.len();
+    for i in 0..l {
         sink.clear();
-        generate_agent_key(&mut sink, agent, token_id);
-        database::put(sink.bytes(), n);
+        generate_agent_key(&mut sink, agents.get(i).unwrap(), token_id);
+        database::put(sink.bytes(), n.get(i).unwrap());
+        EventBuilder::new()
+            .string("setTokenAgents")
+            .address(account)
+            .bytearray(token_id)
+            .address(agents.get(i).unwrap())
+            .number(*n.get(i).unwrap())
+            .notify();
     }
-    EventBuilder::new()
-        .string("setTokenAgents")
-        .address(account)
-        .bytearray(token_id)
-        .number(n)
-        .notify();
     true
 }
 
@@ -410,12 +427,12 @@ fn get_agent_balance(agent: &Address, token_id: &[u8]) -> U128 {
 pub fn add_agents(
     account: &Address,
     agents: Vec<Address>,
-    n: U128,
+    n: Vec<U128>,
     token_ids: Vec<Vec<u8>>,
 ) -> bool {
     assert!(check_witness(account));
     for id in token_ids.iter() {
-        assert!(add_token_agents_inner(account, id, &agents, n));
+        assert!(add_token_agents_inner(account, id, &agents, n.as_slice()));
     }
     true
 }
@@ -431,31 +448,38 @@ pub fn add_agents(
 /// `agents` is the array of agent address
 ///
 /// `n` is number of authorizations per agent
-pub fn add_token_agents(account: &Address, token_id: &[u8], agents: &[Address], n: U128) -> bool {
+pub fn add_token_agents(
+    account: &Address,
+    token_id: &[u8],
+    agents: &[Address],
+    n: Vec<U128>,
+) -> bool {
     assert!(check_witness(account));
-    add_token_agents_inner(account, token_id, agents, n)
+    add_token_agents_inner(account, token_id, agents, n.as_slice())
 }
 
 pub fn add_token_agents_inner(
     account: &Address,
     token_id: &[u8],
     agents: &[Address],
-    n: U128,
+    n: &[U128],
 ) -> bool {
     let mut sink = Sink::new(64);
-    for agent in agents.iter() {
+    let l = agents.len();
+    for i in 0..l {
         sink.clear();
-        generate_agent_key(&mut sink, agent, token_id);
+        generate_agent_key(&mut sink, agents.get(i).unwrap(), token_id);
         let ba = database::get::<_, U128>(sink.bytes()).unwrap_or(0);
-        let ba = ba.checked_add(n).unwrap();
+        let ba = ba.checked_add(n[i]).unwrap();
         database::put(sink.bytes(), ba);
+        EventBuilder::new()
+            .string("addTokenAgents")
+            .address(account)
+            .bytearray(token_id)
+            .address(agents.get(i).unwrap())
+            .number(n[i])
+            .notify();
     }
-    EventBuilder::new()
-        .string("addTokenAgents")
-        .address(account)
-        .bytearray(token_id)
-        .number(n)
-        .notify();
     true
 }
 
@@ -556,6 +580,10 @@ pub fn invoke() {
             let (creator, token_template_bs) = source.read().unwrap();
             sink.write(create_token_template(creator, token_template_bs));
         }
+        b"getTokenTemplateById" => {
+            let token_template_id = source.read().unwrap();
+            sink.write(get_token_template(token_template_id));
+        }
         b"updateTokenTemplate" => {
             let (token_template_id, token_template_bs) = source.read().unwrap();
             sink.write(update_token_template(token_template_id, token_template_bs));
@@ -650,7 +678,7 @@ pub fn invoke() {
             sink.write(add_agents(account, agents, n, token_ids));
         }
         b"addTokenAgents" => {
-            let (account, token_id, agents, n): (&Address, &[u8], Vec<Address>, U128) =
+            let (account, token_id, agents, n): (&Address, &[u8], Vec<Address>, Vec<U128>) =
                 source.read().unwrap();
             sink.write(add_token_agents(account, token_id, agents.as_slice(), n));
         }
@@ -695,9 +723,33 @@ pub fn invoke() {
             let token_id = source.read().unwrap();
             sink.write(oep8::symbol(token_id));
         }
+        b"totalSupply" => {
+            let token_id = source.read().unwrap();
+            sink.write(oep8::total_supply(token_id));
+        }
         b"balanceOf" => {
             let (addr, token_id) = source.read().unwrap();
             sink.write(oep8::balance_of(addr, token_id));
+        }
+        b"approve" => {
+            let (owner, spender, token_id, amt) = source.read().unwrap();
+            sink.write(oep8::approve(owner, spender, token_id, amt));
+        }
+        b"approveMulti" => {
+            let args: Vec<AppMulParam> = source.read().unwrap();
+            sink.write(oep8::approve_multi(args.as_slice()));
+        }
+        b"allowance" => {
+            let (owner, spender, token_id) = source.read().unwrap();
+            sink.write(oep8::allowance(owner, spender, token_id));
+        }
+        b"transferFrom" => {
+            let (spender, from, to, token_id, amt) = source.read().unwrap();
+            sink.write(oep8::transfer_from(spender, from, to, token_id, amt));
+        }
+        b"transferFromMulti" => {
+            let args: Vec<TrFromMulParam> = source.read().unwrap();
+            sink.write(oep8::transfer_from_multi(args.as_slice()));
         }
         _ => {
             let method = str::from_utf8(action).ok().unwrap();

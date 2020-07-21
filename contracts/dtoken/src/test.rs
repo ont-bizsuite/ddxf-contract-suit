@@ -98,7 +98,7 @@ fn generate_dtoken_test() {
     assert!(set_agents(
         &account,
         agents.clone(),
-        n - 1,
+        vec![n - 1],
         vec![token_id.clone()]
     ));
 
@@ -122,7 +122,12 @@ fn generate_dtoken_test() {
     let caa = get_agent_balance(&agent, &token_id);
     assert_eq!(caa, n - 1 - 1);
 
-    assert!(set_token_agents(&account, &token_id, agents.clone(), 1));
+    assert!(set_token_agents(
+        &account,
+        &token_id,
+        agents.clone(),
+        vec![1]
+    ));
 
     let ba = oep8::balance_of(&account, token_id.as_slice());
     assert_eq!(ba, n - 1 - 1 - 1);
@@ -135,7 +140,7 @@ fn generate_dtoken_test() {
     assert!(add_agents(
         &account,
         agents2.clone(),
-        1,
+        vec![1],
         vec![token_id.clone()]
     ));
 
@@ -144,7 +149,7 @@ fn generate_dtoken_test() {
     let caa = get_agent_balance(&agent2, &token_id);
     assert_eq!(caa, 1);
 
-    assert!(add_token_agents(&account, &token_id, &agents2, 1));
+    assert!(add_token_agents(&account, &token_id, &agents2, vec![1]));
 
     let ba = oep8::balance_of(&account, token_id.as_slice());
     assert_eq!(ba, n - 1 - 1 - 1);

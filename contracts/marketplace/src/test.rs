@@ -40,7 +40,6 @@ fn test67() {
     let bs = read_hex("0a6d6574686f644e616d650200000000000000000000000000000000000000001027000000000000000000000000000010270000000000000000000000000000102700000000000000000000000000000000000000000000000000000000000002036161610362626210270000000000000000000000000000").unwrap();
     let mut source = Source::new(bs.as_slice());
     let method: &[u8] = source.read().unwrap();
-    println!("{}",);
     let (item, aaa): (DTokenItem, U128) = source.read().unwrap();
 
     println!("{}", item.expired_date);
@@ -115,21 +114,21 @@ fn test2() {
 
 #[test]
 fn test3() {
-    let data = read_hex("067265736f5f347f00010000000102313220000000000000000000000000000000000000000000000000000000000000000001fbe02b027e61a6d7602f26cfa9487fa58ef9ee7208656e64706f696e74010000000102313220000000000000000000000000000000000000000000000000000000000000000009656e64706f696e7432000000004f000000000000000000000000000000000000000001640000000000000005cac65e00000000010000000101023132200000000000000000000000000000000000000000000000000000000000000000").unwrap_or_default();
+    let data = read_hex("077075626c697368133538343238373838383234323030353432343837fbe02b027e61a6d7602f26cfa9487fa58ef9ee72e43abcf3375244839c012f9633f95862d232a95b00d5bc7348b3098b9fed7f32000000380000000000000000000000000000000000000000000100000000000000fea9165f00000000102700000000000000000000000000000101303502fbe02b027e61a6d7602f26cfa9487fa58ef9ee728813000000baa22722bfaba589eed9ef9760581de679fb251b88130000000100").unwrap_or_default();
     let mut source = Source::new(&data);
-    //    let mthod_name: &str = source.read().unwrap();
-    //    println!("method_name:{}", mthod_name);
-    let (resource_id, ddo, item): (&[u8], &[u8], &[u8]) = source.read().unwrap();
-    //    println!("resource_id:{}", to_hex(resource_id));
-    //    let ddo = ResourceDDO::from_bytes(ddo);
-    //    println!("manager:{}", ddo.manager);
-    //    let item = DTokenItem::from_bytes(item);
-    //    println!("item:{}", item.stocks);
+    let mthod_name: &str = source.read().unwrap();
+    println!("method_name:{}", mthod_name);
+    let (resource_id, ddo, item, sp): (&[u8], &[u8], &[u8], &[u8]) = source.read().unwrap();
+    //        println!("resource_id:{}", to_hex(resource_id));
+    //        let ddo = ResourceDDO::from_bytes(ddo);
+    //        println!("manager:{}", ddo.manager);
+    //        let item = DTokenItem::from_bytes(item);
+    //        println!("item:{}", item.stocks);
 
     let build = build_runtime();
     let addr = ostd::macros::base58!("Aejfo7ZX5PVpenRj23yChnyH64nf8T1zbu");
     build.witness(&[addr]);
-    assert!(dtoken_seller_publish(resource_id, ddo, item, b""));
+    assert!(dtoken_seller_publish(resource_id, ddo, item, sp));
 }
 
 #[test]
@@ -174,7 +173,7 @@ fn serialize() {
     let ddo = ResourceDDO {
         manager: manager.clone(),
         item_meta_hash: h,
-        dtoken_contract_address: Some(vec![dtoken_contract.clone()]),
+        dtoken_contract_address: vec![dtoken_contract.clone()],
         accountant_contract_address: None,
         split_policy_contract_address: None,
     };
@@ -188,7 +187,13 @@ fn serialize() {
 fn publish() {
     let resource_id = b"resource_id";
     let temp = vec![0u8; 36];
-    let token_template = TokenTemplate::new(vec![], vec![], None, vec![temp], vec![]);
+    let token_template = TokenTemplate::new(
+        b"name".to_vec(),
+        b"symbol".to_vec(),
+        None,
+        vec![temp],
+        vec![],
+    );
     let manager = Address::repeat_byte(1);
     let dtoken_contract_address = Address::repeat_byte(2);
     let mp_contract_address = Address::repeat_byte(3);
@@ -196,7 +201,7 @@ fn publish() {
     let ddo = ResourceDDO {
         item_meta_hash: H256::repeat_byte(1),
         manager: manager.clone(),
-        dtoken_contract_address: Some(vec![dtoken_contract_address.clone()]),
+        dtoken_contract_address: vec![dtoken_contract_address.clone()],
         accountant_contract_address: None,
         split_policy_contract_address: None,
     };
@@ -213,7 +218,7 @@ fn publish() {
         contract_type: TokenType::ONG,
         count: 0,
     };
-    let mut templates = vec![];
+    let mut templates = vec![b"template_id".to_vec()];
     let dtoken_item = DTokenItem {
         fee,
         expired_date: 1,
@@ -223,16 +228,6 @@ fn publish() {
     };
 
     let handle = build_runtime();
-    handle.witness(&[manager.clone(), CONTRACT_COMMON.admin().clone()]);
-    let split_param = b"test";
-    assert!(dtoken_seller_publish(
-        resource_id,
-        &ddo.to_bytes(),
-        &dtoken_item.to_bytes(),
-        split_param
-    ));
-
-    assert!(set_dtoken_contract(&dtoken_contract_address));
 
     let buyer = Address::repeat_byte(4);
 
@@ -250,6 +245,17 @@ fn publish() {
         }
     };
     handle.on_contract_call(call_contract);
+
+    handle.witness(&[manager.clone(), CONTRACT_COMMON.admin().clone()]);
+    assert!(set_dtoken_contract(&dtoken_contract_address));
+
+    let split_param = b"test";
+    assert!(dtoken_seller_publish(
+        resource_id,
+        &ddo.to_bytes(),
+        &dtoken_item.to_bytes(),
+        split_param
+    ));
 
     handle.witness(&[buyer.clone()]);
     //    assert!(buy_dtoken(resource_id, 1, &buyer));
