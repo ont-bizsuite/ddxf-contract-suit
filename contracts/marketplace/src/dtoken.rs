@@ -20,17 +20,17 @@ pub fn verify_creator_sig(dtoken: &Address, token_template_id: &[u8]) -> bool {
     true
 }
 
-pub fn verify_auth(dtokens_contract_addr: &Option<Vec<Address>>, token_template_ids: &[Vec<u8>]) {
-    if let Some(dtokens) = dtokens_contract_addr {
-        let l = dtokens.len();
+pub fn verify_auth(dtokens_contract_addr: &[Address], token_template_ids: &[Vec<u8>]) {
+    if dtokens_contract_addr.len() != 0 {
+        let l = dtokens_contract_addr.len();
         for i in 0..l {
             assert!(verify_creator_sig(
-                dtokens.get(i).unwrap(),
+                dtokens_contract_addr.get(i).unwrap(),
                 token_template_ids.get(i).unwrap()
             ));
             let self_addr = address();
             assert!(auth_token_template(
-                dtokens.get(i).unwrap(),
+                dtokens_contract_addr.get(i).unwrap(),
                 token_template_ids.get(i).unwrap(),
                 &self_addr,
             ));
@@ -78,18 +78,18 @@ pub fn auth_token_template(
 }
 
 pub fn transfer_dtoken(
-    dtokens: &Option<Vec<Address>>,
+    dtokens: &[Address],
     token_template_ids: &[Vec<u8>],
     reseller_account: &Address,
     buyer_account: &Address,
     n: U128,
 ) {
-    if let Some(d) = dtokens {
-        let l = d.len();
+    if dtokens.len() != 0 {
+        let l = dtokens.len();
         for i in 0..l {
             let token_template_id = token_template_ids.get(i).unwrap();
             assert!(transfer_dtoken_inner(
-                d.get(i).unwrap(),
+                dtokens.get(i).unwrap(),
                 reseller_account,
                 buyer_account,
                 token_template_id,
@@ -143,16 +143,16 @@ fn transfer_dtoken_multi(
 }
 
 pub fn generate_dtoken(
-    dtokens: &Option<Vec<Address>>,
+    dtokens: &[Address],
     token_template_ids: &[Vec<u8>],
     buyer_account: &Address,
     n: U128,
 ) {
-    if let Some(dtoken_addr) = dtokens {
-        let l = dtoken_addr.len();
+    if dtokens.len() != 0 {
+        let l = dtokens.len();
         for i in 0..l {
             assert!(generate_dtoken_inner(
-                &dtoken_addr[i],
+                &dtokens[i],
                 buyer_account,
                 token_template_ids.get(i).unwrap(),
                 n

@@ -160,7 +160,7 @@ pub fn generate_token(name: &[u8], symbol: &[u8], supply: U128, admin: &Address)
     database::put(gen_balance_key(token_id.as_bytes(), admin.as_ref()), supply);
     database::put(KEY_TOKEN_COUNTER, id + 1);
     EventBuilder::new()
-        .string("generate_token")
+        .string("generateOep8Token")
         .bytearray(token_id.as_bytes())
         .notify();
     token_id.as_bytes().to_vec()

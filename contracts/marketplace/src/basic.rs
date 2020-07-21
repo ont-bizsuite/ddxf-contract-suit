@@ -7,8 +7,8 @@ use common::Fee;
 pub struct ResourceDDO {
     pub manager: Address, // data owner
     pub item_meta_hash: H256,
-    pub dtoken_contract_address: Option<Vec<Address>>, // can be empty
-    pub accountant_contract_address: Option<Address>,  // can be empty
+    pub dtoken_contract_address: Vec<Address>, // can be empty
+    pub accountant_contract_address: Option<Address>, // can be empty
     pub split_policy_contract_address: Option<Address>, //can be empty
 }
 
