@@ -39,6 +39,13 @@ fn set_dtoken_contract_addr(dtoken: &Address) -> bool {
     true
 }
 
+fn init(mp: &Address, dtoken: &Address) -> bool {
+    assert!(check_witness(CONTRACT_COMMON.admin()));
+    database::put(KEY_MP_CONTRACT, mp);
+    database::put(KEY_DTOKEN_CONTRACT, dtoken);
+    true
+}
+
 fn freeze_and_publish(
     old_resource_id: &[u8],
     new_resource_id: &[u8],
@@ -74,7 +81,7 @@ pub fn buy_use_token(
     let mp = get_mp_contract_addr();
     verify_result(wasm::call_contract(
         &mp,
-        ("buyDtoken", (resource_id, n, buyer_account, payer)),
+        ("buyDToken", (resource_id, n, buyer_account, payer)),
     ));
     //call dtoken
     let dtoken = get_dtoken_contract_addr();
@@ -103,7 +110,7 @@ pub fn buy_reward_and_use_token(
     let mp = get_mp_contract_addr();
     verify_result(wasm::call_contract(
         &mp,
-        ("buyDtoken", (resource_id, n, buyer_account, payer)),
+        ("buyDToken", (resource_id, n, buyer_account, payer)),
     ));
 
     //call dtoken
@@ -132,7 +139,7 @@ fn buy_dtokens_and_set_agents(
     for i in 0..l {
         verify_result(wasm::call_contract(
             &mp,
-            ("buyDtoken", (resource_ids[i], ns[i], buyer_account, payer)),
+            ("buyDToken", (resource_ids[i], ns[i], buyer_account, payer)),
         ));
     }
     let dtoken = get_dtoken_contract_addr();
@@ -192,6 +199,10 @@ fn invoke() {
         b"setMpContractAddr" => {
             let mp = source.read().unwrap();
             sink.write(set_mp_contract_addr(mp));
+        }
+        b"init" => {
+            let (mp, dtoken) = source.read().unwrap();
+            sink.write(init(mp, dtoken));
         }
         b"freezeAndPublish" => {
             let (old_resource_id, new_resource_id, resource_ddo, item, split_policy_param_bytes) =

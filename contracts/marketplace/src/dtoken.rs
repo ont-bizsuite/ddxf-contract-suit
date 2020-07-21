@@ -21,7 +21,7 @@ pub fn verify_creator_sig(dtoken: &Address, token_template_id: &[u8]) -> bool {
 }
 
 pub fn verify_auth(dtokens_contract_addr: &[Address], token_template_ids: &[Vec<u8>]) {
-    if dtokens_contract_addr.len() != 0 {
+    if !dtokens_contract_addr.is_empty() {
         let l = dtokens_contract_addr.len();
         for i in 0..l {
             assert!(verify_creator_sig(
@@ -32,7 +32,7 @@ pub fn verify_auth(dtokens_contract_addr: &[Address], token_template_ids: &[Vec<
             assert!(auth_token_template(
                 dtokens_contract_addr.get(i).unwrap(),
                 token_template_ids.get(i).unwrap(),
-                &self_addr,
+                &[self_addr],
             ));
         }
     } else {
@@ -42,7 +42,7 @@ pub fn verify_auth(dtokens_contract_addr: &[Address], token_template_ids: &[Vec<
         assert!(auth_token_template_multi(
             &dtoken,
             token_template_ids,
-            &self_addr,
+            &[self_addr],
         ));
     }
 }
@@ -50,7 +50,7 @@ pub fn verify_auth(dtokens_contract_addr: &[Address], token_template_ids: &[Vec<
 pub fn auth_token_template_multi(
     dtoken: &Address,
     token_template_ids: &[Vec<u8>],
-    authorized_addr: &Address,
+    authorized_addr: &[Address],
 ) -> bool {
     verify_result(wasm::call_contract(
         dtoken,
@@ -65,7 +65,7 @@ pub fn auth_token_template_multi(
 pub fn auth_token_template(
     dtoken: &Address,
     token_template_id: &[u8],
-    authorized_addr: &Address,
+    authorized_addr: &[Address],
 ) -> bool {
     verify_result(wasm::call_contract(
         dtoken,
