@@ -58,7 +58,7 @@ pub fn set_dtoken_contract(new_addr: &Address) -> bool {
 
 /// init contract
 /// set dtoken and split contract address
-pub fn init(dtoken: Address, split_policy: Address) -> bool {
+pub fn init(dtoken: &Address, split_policy: &Address) -> bool {
     assert!(check_witness(CONTRACT_COMMON.admin()));
     database::put(KEY_DTOKEN_CONTRACT, dtoken);
     database::put(KEY_SPLIT_POLICY_CONTRACT, split_policy);
@@ -210,11 +210,12 @@ pub fn dtoken_seller_publish_inner(
         .bytearray(item_id)
         .bytearray(resource_ddo_bytes)
         .bytearray(item_bytes)
+        .bytearray(split_policy_param_bytes)
         .notify();
     true
 }
 
-fn update(
+pub fn update(
     resource_id: &[u8],
     resource_ddo_bytes: &[u8],
     item_bytes: &[u8],
@@ -229,7 +230,7 @@ fn update(
     )
 }
 
-fn delete(resource_id: &[u8]) -> bool {
+pub fn delete(resource_id: &[u8]) -> bool {
     let item_info =
         database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
             .unwrap();
@@ -316,7 +317,7 @@ pub fn buy_dtoken_from_reseller(
 ///
 /// `buyer_account` is buyer address, need this address signature
 pub fn buy_dtokens(
-    resource_ids: Vec<&[u8]>,
+    resource_ids: Vec<Vec<u8>>,
     ns: Vec<U128>,
     buyer_account: &Address,
     payer: &Address,
@@ -324,7 +325,12 @@ pub fn buy_dtokens(
     let l = resource_ids.len();
     assert_eq!(l, ns.len());
     for i in 0..l {
-        assert!(buy_dtoken(resource_ids[i], ns[i], buyer_account, payer));
+        assert!(buy_dtoken(
+            resource_ids[i].as_slice(),
+            ns[i],
+            buyer_account,
+            payer
+        ));
     }
     true
 }
@@ -391,13 +397,18 @@ pub fn buy_dtoken(resource_id: &[u8], n: U128, buyer_account: &Address, payer: &
 
 /// buy_dtoken_reward
 ///
+/// This method can only be called for items that the fee.count is 0, The buyer can reward the seller with any number of tokens.
+///
 /// `resource_id` used to mark the only commodity in the chain
 ///
 /// `n` is the number of purchases
 ///
 /// `buyer_account` is buyer address, need this address signature
+///
 /// `payer` is the address who pay the fee
+///
 /// `unit_price` unit price the buyer is willing to pay
+///
 pub fn buy_dtoken_reward(
     resource_id: &[u8],
     n: U128,
@@ -449,6 +460,7 @@ pub fn buy_dtoken_reward(
         .number(n)
         .address(buyer_account)
         .address(payer)
+        .number(unit_price)
         .notify();
     true
 }
