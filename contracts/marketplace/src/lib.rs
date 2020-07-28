@@ -456,7 +456,7 @@ pub fn buy_dtoken_reward(
 // inner method
 fn transfer_fee(
     oi: &OrderId,
-    buyer_account: &Address,
+    payer: &Address,
     accountant_contract_address: Option<Address>,
     split_contract_address: &Address,
     fee: Fee,
@@ -467,17 +467,14 @@ fn transfer_fee(
             &accountant_addr,
             (
                 "transferAmount",
-                (oi.to_bytes(), buyer_account, split_contract_address, fee, n),
+                (oi.to_bytes(), payer, split_contract_address, fee, n),
             ),
         ),
         _ => {
             let amt = n.checked_mul(fee.count as U128).unwrap();
             wasm::call_contract(
                 split_contract_address,
-                (
-                    "transferWithdraw",
-                    (buyer_account, oi.item_id.as_slice(), amt),
-                ),
+                ("transferWithdraw", (payer, oi.item_id.as_slice(), amt)),
             )
         }
     };
