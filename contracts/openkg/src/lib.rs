@@ -104,20 +104,29 @@ pub fn buy_reward_and_use_token(
     n: U128,
     buyer_account: &Address,
     payer: &Address,
+    reward_uint_price: U128,
     token_template_id: &[u8],
 ) -> bool {
     //call market place
     let mp = get_mp_contract_addr();
     verify_result(wasm::call_contract(
         &mp,
-        ("buyDToken", (resource_id, n, buyer_account, payer)),
+        (
+            "buyDTokenReward",
+            (resource_id, n, buyer_account, payer, reward_uint_price),
+        ),
     ));
 
     //call dtoken
     let dtoken = get_dtoken_contract_addr();
+    //query token_id
+    let res =
+        wasm::call_contract(&dtoken, ("getTokenIdByTemplateId", (token_template_id,))).unwrap();
+    let mut source = Source::new(res.as_slice());
+    let token_id: &[u8] = source.read().unwrap();
     verify_result(wasm::call_contract(
         &dtoken,
-        ("useToken", (buyer_account, token_template_id, n)),
+        ("useToken", (buyer_account, token_id, n)),
     ));
     true
 }
@@ -192,13 +201,19 @@ fn invoke() {
             let (code, vm_type, name, version, author, email, desc) = source.read().unwrap();
             sink.write(CONTRACT_COMMON.migrate(code, vm_type, name, version, author, email, desc));
         }
-        b"setDtokenContractAddr" => {
+        b"setDTokenContractAddr" => {
             let dtoken = source.read().unwrap();
             sink.write(set_dtoken_contract_addr(dtoken));
         }
         b"setMpContractAddr" => {
             let mp = source.read().unwrap();
             sink.write(set_mp_contract_addr(mp));
+        }
+        b"getDToken" => {
+            sink.write(get_dtoken_contract_addr());
+        }
+        b"getMP" => {
+            sink.write(get_mp_contract_addr());
         }
         b"init" => {
             let (mp, dtoken) = source.read().unwrap();
@@ -222,6 +237,18 @@ fn invoke() {
                 n,
                 buyer_account,
                 payer,
+                token_template_id,
+            ));
+        }
+        b"buyRewardAndUseToken" => {
+            let (resource_id, n, buyer_account, payer, unit_price, token_template_id) =
+                source.read().unwrap();
+            sink.write(buy_reward_and_use_token(
+                resource_id,
+                n,
+                buyer_account,
+                payer,
+                unit_price,
                 token_template_id,
             ));
         }

@@ -295,6 +295,11 @@ fn delete_token(account: &Address, token_id: &[u8]) -> bool {
     database::delete(key.as_slice());
     let key = get_key(PRE_AUTHORIZED, template_id.as_slice());
     database::delete(key.as_slice());
+    EventBuilder::new()
+        .string("deleteToken")
+        .address(account)
+        .bytearray(token_id)
+        .notify();
     true
 }
 

@@ -59,9 +59,11 @@ pub fn reg_id_add_attribute_array(reg_id_bytes: Vec<Vec<u8>>) -> bool {
             reg_id.signer.as_slice()
         ));
     }
+    let mut sink = Sink::new(64);
+    sink.write(reg_id_bytes.as_slice());
     EventBuilder::new()
         .string("reg_id_add_attribute_array")
-        .number(reg_id_bytes.len() as U128)
+        .bytearray(sink.bytes())
         .notify();
     true
 }
