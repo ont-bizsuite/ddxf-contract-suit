@@ -78,9 +78,13 @@ pub fn generate_dtoken(acc: &Address, token_template_id: &[u8], n: U128) -> bool
     let caller = runtime::caller();
     assert!(is_valid_addr(&[&caller, acc], token_template_id));
     assert!(check_witness(acc));
+    generate_dtoken_inner(acc, acc, token_template_id, n)
+}
+
+fn generate_dtoken_inner(acc: &Address, to: &Address, token_template_id: &[u8], n: U128) -> bool {
     let tt = get_token_template(token_template_id).unwrap();
     let token_id =
-        oep8::generate_token(tt.token_name.as_slice(), tt.token_symbol.as_slice(), n, acc);
+        oep8::generate_token(tt.token_name.as_slice(), tt.token_symbol.as_slice(), n, to);
     let key = get_key(PRE_TOKEN_ID, token_template_id);
     database::put(key.as_slice(), token_id.as_slice());
     let key = get_key(PRE_TEMPLATE_ID, token_id.as_slice());
@@ -93,6 +97,18 @@ pub fn generate_dtoken(acc: &Address, token_template_id: &[u8], n: U128) -> bool
         .bytearray(token_id.as_slice())
         .notify();
     true
+}
+
+pub fn generate_dtoken_for_other(
+    acc: &Address,
+    to: &Address,
+    token_template_id: &[u8],
+    n: U128,
+) -> bool {
+    let caller = runtime::caller();
+    assert!(is_valid_addr(&[&caller, acc], token_template_id));
+    assert!(check_witness(acc));
+    generate_dtoken_inner(acc, to, token_template_id, n)
 }
 
 pub fn generate_dtoken_multi(acc: &Address, token_template_ids: &[Vec<u8>], n: U128) -> bool {
@@ -646,6 +662,10 @@ pub fn invoke() {
         b"generateDToken" => {
             let (account, token_template_id, n) = source.read().unwrap();
             sink.write(generate_dtoken(account, token_template_id, n));
+        }
+        b"generateDTokenForOther" => {
+            let (account, to, token_template_id, n) = source.read().unwrap();
+            sink.write(generate_dtoken_for_other(account, to, token_template_id, n));
         }
         b"generateDTokenMulti" => {
             let (account, token_template_ids, n): (&Address, Vec<Vec<u8>>, U128) =
