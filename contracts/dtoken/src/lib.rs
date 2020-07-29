@@ -185,6 +185,7 @@ pub fn authorize_token_template(token_template_id: &[u8], authorized_addr: &[Add
     EventBuilder::new()
         .string("authorizeTokenTemplate")
         .bytearray(token_template_id)
+        .address_list(authorized_addr)
         .notify();
     true
 }
@@ -203,6 +204,7 @@ pub fn remove_authorize_addr(token_template_id: &[u8], authorized_addr: &[Addres
     EventBuilder::new()
         .string("removeAuthorizeAddr")
         .bytearray(token_template_id)
+        .address_list(authorized_addr)
         .notify();
     true
 }

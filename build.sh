@@ -1,8 +1,8 @@
-#cd ./contracts/dtoken
+cd ./contracts/dtoken
 #cd ./contracts/marketplace
 #cd ./contracts/openkg
 #cd ./contracts/data_id
-cd ./contracts/split_policy
+#cd ./contracts/split_policy
 
 cargo build --release --target=wasm32-unknown-unknown
 
