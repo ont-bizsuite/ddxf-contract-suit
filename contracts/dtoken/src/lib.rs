@@ -92,6 +92,7 @@ fn generate_dtoken_inner(acc: &Address, to: &Address, token_template_id: &[u8], 
     EventBuilder::new()
         .string("generateDToken")
         .address(acc)
+        .address(to)
         .bytearray(token_template_id)
         .number(n)
         .bytearray(token_id.as_slice())
