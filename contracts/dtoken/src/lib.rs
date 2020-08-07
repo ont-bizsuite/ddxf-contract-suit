@@ -190,13 +190,11 @@ pub fn authorize_token_template(token_template_id: &[u8], authorized_addr: &[Add
     assert!(verify_creator_sig(token_template_id));
     let mut addrs = get_authorized_addr(token_template_id);
     for addr in authorized_addr.iter() {
-        for add in addrs.iter() {
-            if add == addr {
-                continue;
-            }
+        if !addrs.iter().any(|addr| add == addr) {
+            addrs.push(addr.clone());
         }
-        addrs.push(addr.clone());
     }
+
     let key = get_key(PRE_AUTHORIZED, token_template_id);
     database::put(key.as_slice(), addrs);
     EventBuilder::new()
@@ -238,24 +236,23 @@ pub fn authorize_token_template_multi(
 
 fn get_authorized_addr(token_template_id: &[u8]) -> Vec<Address> {
     let key = get_key(PRE_AUTHORIZED, token_template_id);
-    database::get::<_, Vec<Address>>(key.as_slice()).unwrap_or(vec![])
+    database::get(key.as_slice()).unwrap_or(vec![])
 }
 
 fn is_valid_addr(acc: &[&Address], token_template_id: &[u8]) -> bool {
     let tt_info = database::get::<_, TokenTemplateInfo>(get_key(PRE_TT, token_template_id))
         .expect("not existed token template");
-    let ind = acc.iter().position(|&x| x == &tt_info.creator);
-    if ind.is_some() {
+    if acc.contains(&&tt_info.creator) {
         return true;
-    } else {
-        let addrs = get_authorized_addr(token_template_id);
-        for addr in addrs.iter() {
-            let ind = acc.iter().position(|&x| x == addr);
-            if ind.is_some() {
-                return true;
-            }
+    }
+
+    let addrs = get_authorized_addr(token_template_id);
+    for addr in addrs.iter() {
+        if acc.contains(&addr) {
+            return true;
         }
     }
+
     false
 }
 
@@ -339,7 +336,7 @@ pub fn use_token_by_agent(account: &Address, agent: &Address, token_id: &[u8], n
     assert!(ba >= n);
     let mut sink = Sink::new(64);
     generate_agent_key(&mut sink, agent, token_id);
-    let agent_count = database::get::<_, U128>(sink.bytes()).unwrap_or(0);
+    let agent_count = database::get(sink.bytes()).unwrap_or(0);
     assert!(agent_count >= n);
     if agent_count == n {
         database::delete(sink.bytes());
@@ -414,7 +411,7 @@ pub fn set_token_agents_inner(
     n: &[U128],
 ) -> bool {
     let ba = oep8::balance_of(account, token_id);
-    let sum = n.iter().fold(0, |sum, &x| sum + x);
+    let sum = n.iter().sum();
     assert!(ba >= sum);
     let mut sink = Sink::new(64);
     let l = agents.len();
@@ -436,7 +433,7 @@ pub fn set_token_agents_inner(
 fn get_agent_balance(agent: &Address, token_id: &[u8]) -> U128 {
     let mut sink = Sink::new(64);
     generate_agent_key(&mut sink, agent, token_id);
-    database::get::<_, U128>(sink.bytes()).unwrap_or(0)
+    database::get(sink.bytes()).unwrap_or(0)
 }
 
 /// add_agents, this method append agents for the all token
@@ -489,19 +486,18 @@ pub fn add_token_agents_inner(
     n: &[U128],
 ) -> bool {
     let mut sink = Sink::new(64);
-    let l = agents.len();
-    for i in 0..l {
+    for (agent, &n) in agents.into_iter().zip(n.into_iter()) {
         sink.clear();
-        generate_agent_key(&mut sink, agents.get(i).unwrap(), token_id);
-        let ba = database::get::<_, U128>(sink.bytes()).unwrap_or(0);
-        let ba = ba.checked_add(n[i]).unwrap();
+        generate_agent_key(&mut sink, agent, token_id);
+        let ba :u128 = database::get(sink.bytes()).unwrap_or(0);
+        let ba = ba.checked_add(n).unwrap();
         database::put(sink.bytes(), ba);
         EventBuilder::new()
             .string("addTokenAgents")
             .address(account)
             .bytearray(token_id)
-            .address(agents.get(i).unwrap())
-            .number(n[i])
+            .address(agent)
+            .number(n)
             .notify();
     }
     true

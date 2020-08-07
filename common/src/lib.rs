@@ -6,6 +6,7 @@ use ontio_std::abi::EventBuilder;
 use ostd::abi::{Decoder, Encoder, Error, Sink, Source};
 use ostd::prelude::*;
 use ostd::runtime::{check_witness, contract_delete, contract_migrate};
+use ostd::abi::Error::IrregularData;
 
 #[cfg(test)]
 mod test;
@@ -20,12 +21,12 @@ impl OrderId {
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut sink = Sink::new(64);
         sink.write(self);
-        sink.bytes().to_vec()
+        sink.into()
     }
+
     pub fn from_bytes(data: &[u8]) -> OrderId {
         let mut source = Source::new(data);
-        let oi: OrderId = source.read().unwrap();
-        oi
+        source.read().unwrap()
     }
 }
 
@@ -86,26 +87,16 @@ impl Fee {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub enum TokenType {
-    ONT,
-    ONG,
-    OEP4,
+    ONT = 0,
+    ONG = 1,
+    OEP4 = 2,
 }
 
 impl Encoder for TokenType {
     fn encode(&self, sink: &mut Sink) {
-        match self {
-            TokenType::ONT => {
-                sink.write(0u8);
-            }
-            TokenType::ONG => {
-                sink.write(1u8);
-            }
-            TokenType::OEP4 => {
-                sink.write(2u8);
-            }
-        }
+        sink.write(*self as u8);
     }
 }
 
@@ -116,9 +107,7 @@ impl<'a> Decoder<'a> for TokenType {
             0u8 => Ok(TokenType::ONT),
             1u8 => Ok(TokenType::ONG),
             2u8 => Ok(TokenType::OEP4),
-            _ => {
-                panic!("");
-            }
+            _ => Err(IrregularData),
         }
     }
 }
@@ -163,7 +152,7 @@ impl ContractCommon {
     }
 }
 
-pub static CONTRACT_COMMON: ContractCommon =
+pub const CONTRACT_COMMON: ContractCommon =
     ContractCommon::new(ostd::macros::base58!("Aejfo7ZX5PVpenRj23yChnyH64nf8T1zbu"));
 
 #[cfg(test)]

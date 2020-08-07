@@ -14,19 +14,13 @@ pub struct TrMulParam<'a> {
 
 impl<'a> Encoder for TrMulParam<'a> {
     fn encode(&self, sink: &mut Sink) {
-        sink.write(self.from);
-        sink.write(self.to);
-        sink.write(self.id);
-        sink.write(self.amt);
+        sink.write((self.from, self.to, self.id, self.amt));
     }
 }
 
 impl<'a> Decoder<'a> for TrMulParam<'a> {
     fn decode(source: &mut Source<'a>) -> Result<Self, Error> {
-        let from: &Address = source.read().unwrap();
-        let to: &Address = source.read().unwrap();
-        let id: &[u8] = source.read().unwrap();
-        let amt: U128 = source.read().unwrap();
+        let (from, to, id, amt) = source.read().unwrap();
         Ok(TrMulParam { from, to, id, amt })
     }
 }
@@ -51,11 +45,7 @@ impl<'a> Encoder for TrFromMulParam<'a> {
 
 impl<'a> Decoder<'a> for TrFromMulParam<'a> {
     fn decode(source: &mut Source<'a>) -> Result<Self, Error> {
-        let spender = source.read().unwrap();
-        let from = source.read().unwrap();
-        let to = source.read().unwrap();
-        let id = source.read().unwrap();
-        let amt = source.read().unwrap();
+        let (spender, from, to, id, amt) = source.read().unwrap();
         Ok(TrFromMulParam {
             spender,
             from,
