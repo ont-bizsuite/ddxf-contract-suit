@@ -29,7 +29,7 @@ fn set_mp(mp_account: &Address) -> bool {
 }
 
 fn get_mp_account() -> Address {
-    database::get::<_, Address>(utils::KEY_MP).unwrap_or(*CONTRACT_COMMON.admin())
+    database::get(utils::KEY_MP).unwrap_or(*CONTRACT_COMMON.admin())
 }
 
 /// set charging model, need mp and seller signature
@@ -52,7 +52,7 @@ fn set_fee_split_model(seller_acc: &Address, fee_split_model: FeeSplitModel) -> 
 
 /// query seller's charging model by seller's address
 fn get_fee_split_model(seller_acc: &Address) -> FeeSplitModel {
-    database::get::<_, FeeSplitModel>(utils::generate_fee_split_model_key(seller_acc))
+    database::get(utils::generate_fee_split_model_key(seller_acc))
         .unwrap_or(FeeSplitModel { weight: 0 })
 }
 
@@ -97,7 +97,7 @@ fn transfer_amount(
 
 /// query settle info by order id
 fn get_settle_info(order_id: &[u8]) -> SettleInfo {
-    database::get::<_, SettleInfo>(utils::generate_balance_key(order_id))
+    database::get(utils::generate_balance_key(order_id))
         .unwrap_or(SettleInfo::default())
 }
 

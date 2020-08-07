@@ -60,14 +60,9 @@ pub fn register(key: &[u8], param_bytes: &[u8]) -> bool {
         }
         _ => {}
     }
-    let mut valid = false;
-    for aa in param.addr_amt.iter() {
-        if !valid {
-            valid = check_witness(&aa.to);
-            break;
-        }
-    }
-    assert!(valid);
+
+    assert!(param.addr_amt.iter().any(|aa| check_witness(&aa.to)));
+
     database::put(generate_registry_param_key(key), param);
     EventBuilder::new()
         .string("register")
@@ -117,14 +112,13 @@ pub fn get_balance(key: &[u8]) -> U128 {
 pub fn withdraw(key: &[u8], addr: &Address) -> bool {
     assert!(check_witness(addr));
     let mut rp = get_register_param(key);
-    let ind = rp
+    let total = rp.addr_amt.iter().map(|v| *v.weight).sum();
+    let addr_amt = rp
         .addr_amt
-        .iter()
-        .position(|addr_amt| &addr_amt.to == addr)
+        .iter_mut()
+        .find(|addr_amt| &addr_amt.to == addr)
         .expect("not found the addr");
-    let total = rp.addr_amt.iter().fold(0, |res, x| res + x.weight);
 
-    let addr_amt = rp.addr_amt.get_mut(ind).unwrap();
     if addr_amt.has_withdraw == false {
         let self_addr = address();
         let balance = get_balance(key);
@@ -153,7 +147,7 @@ pub fn withdraw(key: &[u8], addr: &Address) -> bool {
 //mp invoke
 pub fn transfer_withdraw(from: &Address, key: &[u8], amt: U128) -> bool {
     let mut rp = get_register_param(key);
-    let total = rp.addr_amt.iter().fold(0, |res, x| res + x.weight);
+    let total = rp.addr_amt.iter().map(|v|*v.weight).sum();
     for addr_amt in rp.addr_amt.iter_mut() {
         if !addr_amt.has_withdraw {
             let temp = amt.checked_mul(addr_amt.weight as U128).unwrap();
