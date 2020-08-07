@@ -3,10 +3,10 @@
 extern crate ontio_std as ostd;
 use core::option::Option;
 use ontio_std::abi::EventBuilder;
+use ostd::abi::Error::IrregularData;
 use ostd::abi::{Decoder, Encoder, Error, Sink, Source};
 use ostd::prelude::*;
 use ostd::runtime::{check_witness, contract_delete, contract_migrate};
-use ostd::abi::Error::IrregularData;
 
 #[cfg(test)]
 mod test;

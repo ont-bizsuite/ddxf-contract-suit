@@ -97,8 +97,7 @@ fn transfer_amount(
 
 /// query settle info by order id
 fn get_settle_info(order_id: &[u8]) -> SettleInfo {
-    database::get(utils::generate_balance_key(order_id))
-        .unwrap_or(SettleInfo::default())
+    database::get(utils::generate_balance_key(order_id)).unwrap_or(SettleInfo::default())
 }
 
 /// expense settlement, first transfer fee to mp, second invoke "transferWithdraw" method of split contract

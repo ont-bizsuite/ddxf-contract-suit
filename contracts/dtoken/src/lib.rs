@@ -190,7 +190,7 @@ pub fn authorize_token_template(token_template_id: &[u8], authorized_addr: &[Add
     assert!(verify_creator_sig(token_template_id));
     let mut addrs = get_authorized_addr(token_template_id);
     for addr in authorized_addr.iter() {
-        if !addrs.iter().any(|addr| add == addr) {
+        if !addrs.iter().any(|add| add == addr) {
             addrs.push(addr.clone());
         }
     }
@@ -489,7 +489,7 @@ pub fn add_token_agents_inner(
     for (agent, &n) in agents.into_iter().zip(n.into_iter()) {
         sink.clear();
         generate_agent_key(&mut sink, agent, token_id);
-        let ba :u128 = database::get(sink.bytes()).unwrap_or(0);
+        let ba: u128 = database::get(sink.bytes()).unwrap_or(0);
         let ba = ba.checked_add(n).unwrap();
         database::put(sink.bytes(), ba);
         EventBuilder::new()

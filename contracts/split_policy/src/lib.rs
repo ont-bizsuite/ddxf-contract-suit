@@ -112,7 +112,7 @@ pub fn get_balance(key: &[u8]) -> U128 {
 pub fn withdraw(key: &[u8], addr: &Address) -> bool {
     assert!(check_witness(addr));
     let mut rp = get_register_param(key);
-    let total = rp.addr_amt.iter().map(|v| *v.weight).sum();
+    let total: u32 = rp.addr_amt.iter().map(|v| v.weight).sum();
     let addr_amt = rp
         .addr_amt
         .iter_mut()
@@ -147,7 +147,7 @@ pub fn withdraw(key: &[u8], addr: &Address) -> bool {
 //mp invoke
 pub fn transfer_withdraw(from: &Address, key: &[u8], amt: U128) -> bool {
     let mut rp = get_register_param(key);
-    let total = rp.addr_amt.iter().map(|v|*v.weight).sum();
+    let total: u32 = rp.addr_amt.iter().map(|v| v.weight).sum();
     for addr_amt in rp.addr_amt.iter_mut() {
         if !addr_amt.has_withdraw {
             let temp = amt.checked_mul(addr_amt.weight as U128).unwrap();
