@@ -759,6 +759,10 @@ pub fn invoke() {
             let (addr, token_id) = source.read().unwrap();
             sink.write(oep8::balance_of(addr, token_id));
         }
+        b"balancesOf" => {
+            let addr = source.read().unwrap();
+            sink.write(oep8::balances_of(addr));
+        }
         b"approve" => {
             let (owner, spender, token_id, amt) = source.read().unwrap();
             sink.write(oep8::approve(owner, spender, token_id, amt));
