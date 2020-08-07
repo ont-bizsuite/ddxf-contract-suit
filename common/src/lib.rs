@@ -133,7 +133,7 @@ impl ContractCommon {
     pub fn migrate(
         &self,
         code: &[u8],
-        vm_type: u32,
+        vm_type: U128,
         name: &str,
         version: &str,
         author: &str,
@@ -141,7 +141,7 @@ impl ContractCommon {
         desc: &str,
     ) -> bool {
         assert!(check_witness(&self.admin));
-        let new_addr = contract_migrate(code, vm_type, name, version, author, email, desc);
+        let new_addr = contract_migrate(code, vm_type as u32, name, version, author, email, desc);
         let empty_addr = Address::new([0u8; 20]);
         assert_ne!(new_addr, empty_addr);
         EventBuilder::new()
