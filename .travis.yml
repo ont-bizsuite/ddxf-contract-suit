@@ -7,6 +7,11 @@ before_script:
 
 script:
     - pushd ./contracts/marketplace && cargo build --release --target=wasm32-unknown-unknown && popd
+    - pushd ./contracts/dtoken && cargo build --release --target=wasm32-unknown-unknown && popd
+    - pushd ./contracts/openkg && cargo build --release --target=wasm32-unknown-unknown && popd
+    - pushd ./contracts/dataid && cargo build --release --target=wasm32-unknown-unknown && popd
+    - pushd ./contracts/accountant && cargo build --release --target=wasm32-unknown-unknown && popd
+    - pushd ./contracts/split_policy && cargo build --release --target=wasm32-unknown-unknown && popd
 
 after_success: |
     [ $TRAVIS_BRANCH = master ] &&

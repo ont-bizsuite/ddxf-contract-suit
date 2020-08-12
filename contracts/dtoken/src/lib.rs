@@ -24,7 +24,6 @@ mod test;
 #[cfg(test)]
 mod oep8_test;
 
-const KEY_DDXF_CONTRACT: &[u8] = b"02";
 const KEY_ADMIN: &[u8] = b"03";
 const KEY_TT_ID: &[u8] = b"05";
 const PRE_TT: &[u8] = b"06";
@@ -32,21 +31,6 @@ const PRE_AUTHORIZED: &[u8] = b"07";
 const PRE_TOKEN_ID: &[u8] = b"08";
 const PRE_TEMPLATE_ID: &[u8] = b"09";
 const PRE_AGENT: &[u8] = b"10";
-
-/// set marketplace contract address, need admin signature
-///
-/// only marketplace contract has the right to invoke some method
-fn set_mp_contract(new_addr: &Address) -> bool {
-    let admin = get_admin();
-    assert!(check_witness(&admin));
-    database::put(KEY_DDXF_CONTRACT, new_addr);
-    true
-}
-
-/// query marketplace contract address
-fn get_mp_contract() -> Address {
-    database::get(KEY_DDXF_CONTRACT).unwrap_or(Address::new([0u8; 20]))
-}
 
 /// update admin address
 ///
@@ -75,10 +59,7 @@ fn get_admin() -> Address {
 ///
 /// `n` represents the number of generate tokens
 pub fn generate_dtoken(acc: &Address, token_template_id: &[u8], n: U128) -> bool {
-    let caller = runtime::caller();
-    assert!(is_valid_addr(&[&caller, acc], token_template_id));
-    assert!(check_witness(acc));
-    generate_dtoken_inner(acc, acc, token_template_id, n)
+    generate_dtoken_for_other(acc, acc, token_template_id, n)
 }
 
 fn generate_dtoken_inner(acc: &Address, to: &Address, token_template_id: &[u8], n: U128) -> bool {
@@ -120,44 +101,44 @@ pub fn generate_dtoken_multi(acc: &Address, token_template_ids: &[Vec<u8>], n: U
 }
 
 fn get_token_template(token_template_id: &[u8]) -> Option<TokenTemplate> {
-    let info = database::get::<_, TokenTemplateInfo>(get_key(PRE_TT, token_template_id));
-    if let Some(data) = info {
-        Some(TokenTemplate::from_bytes(data.token_template.as_slice()))
-    } else {
-        None
-    }
+    let info: Option<TokenTemplateInfo> = database::get(get_key(PRE_TT, token_template_id));
+    info.map(|data| data.token_template)
 }
 
-pub fn create_token_template(creator: &Address, tt_bs: &[u8]) -> bool {
+pub fn create_token_template(creator: &Address, tt: TokenTemplate) -> bool {
     assert!(check_witness(creator));
     let tt_id = get_next_tt_id();
     let tt_id_str = tt_id.to_string();
     database::put(
         get_key(PRE_TT, tt_id_str.as_bytes()),
-        TokenTemplateInfo::new(creator.clone(), tt_bs.to_vec()),
+        TokenTemplateInfo {
+            creator: creator.clone(),
+            token_template: tt,
+        },
     );
     update_next_tt_id(tt_id + 1);
     EventBuilder::new()
         .string("createTokenTemplate")
         .address(creator)
-        .bytearray(tt_bs)
         .bytearray(tt_id_str.as_bytes())
         .notify();
     true
 }
 
-pub fn update_token_template(token_template_id: &[u8], tt_bs: &[u8]) -> bool {
-    let tt_info = database::get::<_, TokenTemplateInfo>(get_key(PRE_TT, token_template_id))
-        .expect("not existed token template");
-    assert!(check_witness(&tt_info.creator));
+pub fn update_token_template(template_id: &[u8], tt: TokenTemplate) -> bool {
+    let creator = database::get(get_key(PRE_TT, template_id)).expect("not existed token template");
+    assert!(check_witness(&creator));
     database::put(
-        get_key(PRE_TT, token_template_id),
-        TokenTemplateInfo::new(tt_info.creator, tt_bs.to_vec()),
+        get_key(PRE_TT, template_id),
+        TokenTemplateInfo {
+            creator: creator.clone(),
+            token_template: tt,
+        },
     );
     EventBuilder::new()
         .string("updateTokenTemplate")
-        .bytearray(token_template_id)
-        .bytearray(tt_bs)
+        .address(&creator)
+        .bytearray(template_id)
         .notify();
     true
 }
@@ -173,9 +154,9 @@ pub fn remove_token_template(token_template_id: &[u8]) -> bool {
 }
 
 pub fn verify_creator_sig(token_template_id: &[u8]) -> bool {
-    let tt_info = database::get::<_, TokenTemplateInfo>(get_key(PRE_TT, token_template_id))
-        .expect("not existed token template");
-    assert!(check_witness(&tt_info.creator));
+    let creator =
+        database::get(get_key(PRE_TT, token_template_id)).expect("not existed token template");
+    assert!(check_witness(&creator));
     true
 }
 
@@ -246,14 +227,8 @@ fn is_valid_addr(acc: &[&Address], token_template_id: &[u8]) -> bool {
         return true;
     }
 
-    let addrs = get_authorized_addr(token_template_id);
-    for addr in addrs.iter() {
-        if acc.contains(&addr) {
-            return true;
-        }
-    }
-
-    false
+    let authed = get_authorized_addr(token_template_id);
+    authed.iter().any(|auth| acc.contains(&auth))
 }
 
 fn get_token_id_by_template_id(token_template_id: &[u8]) -> Vec<u8> {
@@ -261,6 +236,7 @@ fn get_token_id_by_template_id(token_template_id: &[u8]) -> Vec<u8> {
     database::get::<_, Vec<u8>>(key.as_slice()).unwrap_or(vec![])
 }
 
+//todo: need remove
 fn get_template_id_by_token_id(token_id: &[u8]) -> Vec<u8> {
     let key = get_key(PRE_TEMPLATE_ID, token_id);
     database::get::<_, Vec<u8>>(key.as_slice()).unwrap_or(vec![])
@@ -335,8 +311,7 @@ pub fn use_token_by_agent(account: &Address, agent: &Address, token_id: &[u8], n
     let ba = oep8::balance_of(account, token_id);
     assert!(ba >= n);
     let mut sink = Sink::new(64);
-    generate_agent_key(&mut sink, agent, token_id);
-    let agent_count = database::get(sink.bytes()).unwrap_or(0);
+    let agent_count = database::get(generate_agent_key(&mut sink, agent, token_id)).unwrap_or(0);
     assert!(agent_count >= n);
     if agent_count == n {
         database::delete(sink.bytes());
@@ -414,17 +389,15 @@ pub fn set_token_agents_inner(
     let sum = n.iter().sum();
     assert!(ba >= sum);
     let mut sink = Sink::new(64);
-    let l = agents.len();
-    for i in 0..l {
+    for (agent, num) in agents.into_iter().zip(n.iter()) {
         sink.clear();
-        generate_agent_key(&mut sink, agents.get(i).unwrap(), token_id);
-        database::put(sink.bytes(), n.get(i).unwrap());
+        database::put(generate_agent_key(&mut sink, agent, token_id), num);
         EventBuilder::new()
             .string("setTokenAgents")
             .address(account)
             .bytearray(token_id)
-            .address(agents.get(i).unwrap())
-            .number(*n.get(i).unwrap())
+            .address(agent)
+            .number(*num)
             .notify();
     }
     true
@@ -432,8 +405,7 @@ pub fn set_token_agents_inner(
 
 fn get_agent_balance(agent: &Address, token_id: &[u8]) -> U128 {
     let mut sink = Sink::new(64);
-    generate_agent_key(&mut sink, agent, token_id);
-    database::get(sink.bytes()).unwrap_or(0)
+    database::get(generate_agent_key(&mut sink, agent, token_id)).unwrap_or(0)
 }
 
 /// add_agents, this method append agents for the all token
@@ -488,8 +460,7 @@ pub fn add_token_agents_inner(
     let mut sink = Sink::new(64);
     for (agent, &n) in agents.into_iter().zip(n.into_iter()) {
         sink.clear();
-        generate_agent_key(&mut sink, agent, token_id);
-        let ba: u128 = database::get(sink.bytes()).unwrap_or(0);
+        let ba: u128 = database::get(generate_agent_key(&mut sink, agent, token_id)).unwrap_or(0);
         let ba = ba.checked_add(n).unwrap();
         database::put(sink.bytes(), ba);
         EventBuilder::new()
@@ -583,13 +554,6 @@ pub fn invoke() {
         }
         b"getAdmin" => {
             sink.write(get_admin());
-        }
-        b"setMpContract" => {
-            let new_addr = source.read().unwrap();
-            sink.write(set_mp_contract(new_addr));
-        }
-        b"getMpContract" => {
-            sink.write(get_mp_contract());
         }
         b"migrate" => {
             let (code, vm_type, name, version, author, email, desc) = source.read().unwrap();
@@ -789,9 +753,14 @@ pub fn invoke() {
 
 mod utils {
     use super::*;
-    pub fn generate_agent_key(sink: &mut Sink, agent: &Address, token_id: &[u8]) {
+    pub fn generate_agent_key<'a>(
+        sink: &'a mut Sink,
+        agent: &Address,
+        token_id: &[u8],
+    ) -> &'a [u8] {
         sink.write(PRE_AGENT);
         sink.write(agent);
         sink.write(token_id);
+        sink.bytes()
     }
 }
