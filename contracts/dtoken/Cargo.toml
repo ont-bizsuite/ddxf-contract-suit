@@ -22,4 +22,6 @@ etcommon-hexutil = { version = "0.2.4", default-features = false }
 
 
 [features]
+default = ["layer1"]
 mock = ["ontio-std/mock"]
+layer1 = []

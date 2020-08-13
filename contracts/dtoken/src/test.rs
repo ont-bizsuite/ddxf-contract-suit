@@ -15,7 +15,7 @@ fn test_create_tt() {
         vec![],
         vec![0u8],
     );
-    assert!(create_token_template(&creator, tt.to_bytes().as_slice()));
+    assert!(create_token_template(&creator, tt));
     let token_template_id = b"0";
     let authorized_addr = Address::repeat_byte(2);
     assert!(authorize_token_template(

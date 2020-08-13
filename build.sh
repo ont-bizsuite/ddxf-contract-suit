@@ -6,7 +6,8 @@ cd ./contracts/dtoken
 #cd ./contracts/accountant
 
 cargo build --release --target=wasm32-unknown-unknown
-
+#disable "layer1" feature to build layer2 contract
+#cargo build --no-default-features --release --target=wasm32-unknown-unknown
 cd ../../
 mkdir -p output
 for wasm in $(ls ./target/wasm32-unknown-unknown/release/*.wasm); do

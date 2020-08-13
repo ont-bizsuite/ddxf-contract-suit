@@ -169,6 +169,27 @@ pub fn transfer(from: &Address, to: &Address, id: &[u8], amt: u128) -> bool {
     transfer_inner(from, to, id, amt)
 }
 
+pub fn transfer_to_layer2(from: &Address, to: &Address, id: &[u8], amt: u128, l2id: u128) -> bool {
+    assert!(check_witness(from));
+    let from_ba = balance_of(from, id)
+        .checked_sub(amt)
+        .expect("balance not enouph!");
+    if from_ba == 0 {
+        database::delete(gen_balance_key(id, from.as_ref()));
+    } else {
+        database::put(gen_balance_key(id, from.as_ref()), from_ba);
+    }
+    EventBuilder::new()
+        .string("transferToLayer2")
+        .number(l2id)
+        .address(from)
+        .address(to)
+        .bytearray(id)
+        .number(amt)
+        .notify();
+    true
+}
+
 pub fn transfer_inner(from: &Address, to: &Address, id: &[u8], amt: u128) -> bool {
     let from_ba = balance_of(from, id);
     assert!(from_ba >= amt);
