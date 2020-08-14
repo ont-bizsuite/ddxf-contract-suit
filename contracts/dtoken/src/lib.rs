@@ -69,8 +69,6 @@ fn generate_dtoken_inner(acc: &Address, to: &Address, token_template_id: &[u8], 
     let tt = get_token_template(token_template_id).unwrap();
     let token_id =
         oep8::generate_token(tt.token_name.as_slice(), tt.token_symbol.as_slice(), n, to);
-    let key = get_key(PRE_TOKEN_ID, token_template_id);
-    database::put(key.as_slice(), token_id.as_slice());
     let key = get_key(PRE_TEMPLATE_ID, token_id.as_slice());
     database::put(key.as_slice(), token_template_id);
     EventBuilder::new()
@@ -129,18 +127,15 @@ pub fn create_token_template(creator: &Address, tt: TokenTemplate) -> bool {
 }
 
 pub fn update_token_template(template_id: &[u8], tt: TokenTemplate) -> bool {
-    let creator = database::get(get_key(PRE_TT, template_id)).expect("not existed token template");
+    let creator =
+        database::get(get_key(PRE_TT, template_id)).expect("not existed token template");
     assert!(check_witness(&creator));
-    database::put(
-        get_key(PRE_TT, template_id),
-        TokenTemplateInfo {
-            creator: creator.clone(),
-            token_template: tt,
-        },
-    );
+    database::put(get_key(PRE_TT, template_id), TokenTemplateInfo{
+        creator,
+        token_template:tt,
+    });
     EventBuilder::new()
         .string("updateTokenTemplate")
-        .address(&creator)
         .bytearray(template_id)
         .notify();
     true
@@ -232,11 +227,6 @@ fn is_valid_addr(acc: &[&Address], token_template_id: &[u8]) -> bool {
 
     let authed = get_authorized_addr(token_template_id);
     authed.iter().any(|auth| acc.contains(&auth))
-}
-
-pub fn get_token_id_by_template_id(token_template_id: &[u8]) -> Vec<u8> {
-    let key = get_key(PRE_TOKEN_ID, token_template_id);
-    database::get::<_, Vec<u8>>(key.as_slice()).unwrap_or(vec![])
 }
 
 //todo: need remove
@@ -523,26 +513,6 @@ pub fn remove_token_agents_inner(account: &Address, token_id: &[u8], agents: &[A
     true
 }
 
-pub fn transfer_dtoken_multi(
-    from: &Address,
-    to: &Address,
-    token_template_ids: &[Vec<u8>],
-    n: U128,
-) -> bool {
-    assert!(check_witness(from));
-    for token_template_id in token_template_ids.iter() {
-        let token_id = get_token_id_by_template_id(token_template_id);
-        assert!(oep8::transfer_inner(from, to, token_id.as_slice(), n));
-    }
-    true
-}
-
-pub fn transfer_dtoken(from: &Address, to: &Address, token_template_id: &[u8], n: U128) -> bool {
-    let token_id = get_token_id_by_template_id(token_template_id);
-    assert!(oep8::transfer(from, to, token_id.as_slice(), n));
-    true
-}
-
 /// transfer dtoken to layer2.
 ///
 /// will fail if admin has not set layer2 id before.
@@ -635,10 +605,6 @@ fn layer_action(action: &[u8], sink: &mut Sink, source: &mut Source) -> bool {
             let token_template_id = source.read().unwrap();
             sink.write(get_authorized_addr(token_template_id));
         }
-        b"getTokenIdByTemplateId" => {
-            let token_template_id = source.read().unwrap();
-            sink.write(get_token_id_by_template_id(token_template_id));
-        }
         b"getTemplateIdByTokenId" => {
             let token_id = source.read().unwrap();
             sink.write(get_template_id_by_token_id(token_id));
@@ -665,20 +631,6 @@ fn layer_action(action: &[u8], sink: &mut Sink, source: &mut Source) -> bool {
             sink.write(delete_token(account, token_id));
         }
         //**************************mp invoke*************************
-        b"transferDTokenMulti" => {
-            let (from, to, token_template_ids, n): (&Address, &Address, Vec<Vec<u8>>, U128) =
-                source.read().unwrap();
-            sink.write(transfer_dtoken_multi(
-                from,
-                to,
-                token_template_ids.as_slice(),
-                n,
-            ));
-        }
-        b"transferDToken" => {
-            let (from, to, token_template_ids, n) = source.read().unwrap();
-            sink.write(transfer_dtoken(from, to, token_template_ids, n));
-        }
         b"setLayer2Id" => sink.write(set_layer2_id(source.read().unwrap())),
         b"transferToLayer2" => {
             let (from, to, id, amt) = source.read().unwrap();
