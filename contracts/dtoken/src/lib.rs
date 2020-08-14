@@ -127,11 +127,13 @@ pub fn create_token_template(creator: &Address, tt: TokenTemplate) -> bool {
 }
 
 pub fn update_token_template(template_id: &[u8], tt: TokenTemplate) -> bool {
-    let mut info: TokenTemplateInfo =
+    let creator =
         database::get(get_key(PRE_TT, template_id)).expect("not existed token template");
-    assert!(check_witness(&info.creator));
-    info.token_template = tt;
-    database::put(get_key(PRE_TT, template_id), info);
+    assert!(check_witness(&creator));
+    database::put(get_key(PRE_TT, template_id), TokenTemplateInfo{
+        creator,
+        token_template:tt,
+    });
     EventBuilder::new()
         .string("updateTokenTemplate")
         .bytearray(template_id)
