@@ -543,17 +543,28 @@ pub fn transfer_dtoken(from: &Address, to: &Address, token_template_id: &[u8], n
     true
 }
 
+/// transfer dtoken to layer2.
+///
+/// will fail if admin has not set layer2 id before.
 #[cfg(feature = "layer1")]
 pub fn transfer_to_layer2(from: &Address, to: &Address, id: &[u8], amt: u128) -> bool {
     let l2id = database::get(PRE_LAYER2).expect("layer2 id is not set!");
     oep8::transfer_to_layer2(from, to, id, amt, l2id)
 }
 
+/// set layer2 id to enable cross layer dtoken transfer.
 #[cfg(feature = "layer1")]
 pub fn set_layer2_id(l2id: u128) -> bool {
+    assert_ne!(l2id, 0);
     assert!(check_witness(&get_admin()));
     database::put(PRE_LAYER2, l2id);
     true
+}
+
+/// return layer2 id set before, return 0 if unset.
+#[cfg(feature = "layer1")]
+pub fn get_layer2_id() -> u128 {
+    database::get(PRE_LAYER2).unwrap_or_default()
 }
 
 #[cfg(not(feature = "layer1"))]

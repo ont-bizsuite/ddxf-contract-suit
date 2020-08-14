@@ -191,6 +191,7 @@ pub fn transfer_to_layer2(from: &Address, to: &Address, id: &[u8], amt: u128, l2
     true
 }
 
+/// release dtoken transfered from layer1.
 #[cfg(not(feature = "layer1"))]
 pub fn transfer_from_layer1(
     from: &Address,
