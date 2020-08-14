@@ -47,7 +47,7 @@ pub fn update_admin(new_admin: &Address) -> bool {
 
 /// query admin address
 pub fn get_admin() -> Address {
-    database::get::<_, Address>(KEY_ADMIN).unwrap_or(*CONTRACT_COMMON.admin())
+    database::get(KEY_ADMIN).unwrap_or(*CONTRACT_COMMON.admin())
 }
 
 /// generate dtoken
@@ -543,26 +543,45 @@ pub fn transfer_dtoken(from: &Address, to: &Address, token_template_id: &[u8], n
     true
 }
 
+/// transfer dtoken to layer2.
+///
+/// will fail if admin has not set layer2 id before.
 #[cfg(feature = "layer1")]
 pub fn transfer_to_layer2(from: &Address, to: &Address, id: &[u8], amt: u128) -> bool {
     let l2id = database::get(PRE_LAYER2).expect("layer2 id is not set!");
     oep8::transfer_to_layer2(from, to, id, amt, l2id)
 }
 
+/// set layer2 id to enable cross layer dtoken transfer.
 #[cfg(feature = "layer1")]
 pub fn set_layer2_id(l2id: u128) -> bool {
+    assert_ne!(l2id, 0);
     assert!(check_witness(&get_admin()));
     database::put(PRE_LAYER2, l2id);
     true
 }
 
+/// return layer2 id set before, return 0 if unset.
+#[cfg(feature = "layer1")]
+pub fn get_layer2_id() -> u128 {
+    database::get(PRE_LAYER2).unwrap_or_default()
+}
+
 #[cfg(not(feature = "layer1"))]
-fn layer1_action(_action: &[u8], _sink: &mut Sink, _source: &mut Source) -> bool {
-    false
+fn layer_action(action: &[u8], sink: &mut Sink, source: &mut Source) -> bool {
+    match action {
+        b"transferFromLayer1" => {
+            let (from, to, id, amt) = source.read().unwrap();
+            sink.write(oep8::transfer_from_layer1(from, to, id, amt, &get_admin()));
+        }
+        _ => return false,
+    }
+
+    true
 }
 
 #[cfg(feature = "layer1")]
-fn layer1_action(action: &[u8], sink: &mut Sink, source: &mut Source) -> bool {
+fn layer_action(action: &[u8], sink: &mut Sink, source: &mut Source) -> bool {
     match action {
         b"createTokenTemplate" => {
             let (creator, token_template_bs) = source.read().unwrap();
@@ -677,7 +696,7 @@ pub fn invoke() {
     let mut source = Source::new(&input);
     let action: &[u8] = source.read().unwrap();
     let mut sink = Sink::new(12);
-    let handled = layer1_action(action, &mut sink, &mut source);
+    let handled = layer_action(action, &mut sink, &mut source);
 
     if !handled {
         match action {
