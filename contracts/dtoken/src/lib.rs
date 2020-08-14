@@ -16,7 +16,7 @@ use basic::*;
 use common::CONTRACT_COMMON;
 use ostd::runtime::check_witness;
 
-mod oep8;
+pub mod oep8;
 
 #[cfg(test)]
 mod test;
@@ -24,7 +24,6 @@ mod test;
 #[cfg(test)]
 mod oep8_test;
 
-const KEY_DDXF_CONTRACT: &[u8] = b"02";
 const KEY_ADMIN: &[u8] = b"03";
 const KEY_TT_ID: &[u8] = b"05";
 const PRE_TT: &[u8] = b"06";
@@ -33,25 +32,13 @@ const PRE_TOKEN_ID: &[u8] = b"08";
 const PRE_TEMPLATE_ID: &[u8] = b"09";
 const PRE_AGENT: &[u8] = b"10";
 
-/// set marketplace contract address, need admin signature
-///
-/// only marketplace contract has the right to invoke some method
-fn set_mp_contract(new_addr: &Address) -> bool {
-    let admin = get_admin();
-    assert!(check_witness(&admin));
-    database::put(KEY_DDXF_CONTRACT, new_addr);
-    true
-}
-
-/// query marketplace contract address
-fn get_mp_contract() -> Address {
-    database::get(KEY_DDXF_CONTRACT).unwrap_or(Address::new([0u8; 20]))
-}
+#[cfg(feature = "layer1")]
+const PRE_LAYER2: &[u8] = b"L";
 
 /// update admin address
 ///
 /// need old admin signature
-fn update_admin(new_admin: &Address) -> bool {
+pub fn update_admin(new_admin: &Address) -> bool {
     let old_admin = get_admin();
     assert!(check_witness(&old_admin));
     database::put(KEY_ADMIN, new_admin);
@@ -59,7 +46,7 @@ fn update_admin(new_admin: &Address) -> bool {
 }
 
 /// query admin address
-fn get_admin() -> Address {
+pub fn get_admin() -> Address {
     database::get::<_, Address>(KEY_ADMIN).unwrap_or(*CONTRACT_COMMON.admin())
 }
 
@@ -75,10 +62,7 @@ fn get_admin() -> Address {
 ///
 /// `n` represents the number of generate tokens
 pub fn generate_dtoken(acc: &Address, token_template_id: &[u8], n: U128) -> bool {
-    let caller = runtime::caller();
-    assert!(is_valid_addr(&[&caller, acc], token_template_id));
-    assert!(check_witness(acc));
-    generate_dtoken_inner(acc, acc, token_template_id, n)
+    generate_dtoken_for_other(acc, acc, token_template_id, n)
 }
 
 fn generate_dtoken_inner(acc: &Address, to: &Address, token_template_id: &[u8], n: U128) -> bool {
@@ -119,45 +103,45 @@ pub fn generate_dtoken_multi(acc: &Address, token_template_ids: &[Vec<u8>], n: U
     true
 }
 
-fn get_token_template(token_template_id: &[u8]) -> Option<TokenTemplate> {
-    let info = database::get::<_, TokenTemplateInfo>(get_key(PRE_TT, token_template_id));
-    if let Some(data) = info {
-        Some(TokenTemplate::from_bytes(data.token_template.as_slice()))
-    } else {
-        None
-    }
+pub fn get_token_template(token_template_id: &[u8]) -> Option<TokenTemplate> {
+    let info: Option<TokenTemplateInfo> = database::get(get_key(PRE_TT, token_template_id));
+    info.map(|data| data.token_template)
 }
 
-pub fn create_token_template(creator: &Address, tt_bs: &[u8]) -> bool {
+pub fn create_token_template(creator: &Address, tt: TokenTemplate) -> bool {
     assert!(check_witness(creator));
     let tt_id = get_next_tt_id();
     let tt_id_str = tt_id.to_string();
     database::put(
         get_key(PRE_TT, tt_id_str.as_bytes()),
-        TokenTemplateInfo::new(creator.clone(), tt_bs.to_vec()),
+        TokenTemplateInfo {
+            creator: creator.clone(),
+            token_template: tt,
+        },
     );
     update_next_tt_id(tt_id + 1);
     EventBuilder::new()
         .string("createTokenTemplate")
         .address(creator)
-        .bytearray(tt_bs)
         .bytearray(tt_id_str.as_bytes())
         .notify();
     true
 }
 
-pub fn update_token_template(token_template_id: &[u8], tt_bs: &[u8]) -> bool {
-    let tt_info = database::get::<_, TokenTemplateInfo>(get_key(PRE_TT, token_template_id))
-        .expect("not existed token template");
-    assert!(check_witness(&tt_info.creator));
+pub fn update_token_template(template_id: &[u8], tt: TokenTemplate) -> bool {
+    let creator = database::get(get_key(PRE_TT, template_id)).expect("not existed token template");
+    assert!(check_witness(&creator));
     database::put(
-        get_key(PRE_TT, token_template_id),
-        TokenTemplateInfo::new(tt_info.creator, tt_bs.to_vec()),
+        get_key(PRE_TT, template_id),
+        TokenTemplateInfo {
+            creator: creator.clone(),
+            token_template: tt,
+        },
     );
     EventBuilder::new()
         .string("updateTokenTemplate")
-        .bytearray(token_template_id)
-        .bytearray(tt_bs)
+        .address(&creator)
+        .bytearray(template_id)
         .notify();
     true
 }
@@ -173,9 +157,9 @@ pub fn remove_token_template(token_template_id: &[u8]) -> bool {
 }
 
 pub fn verify_creator_sig(token_template_id: &[u8]) -> bool {
-    let tt_info = database::get::<_, TokenTemplateInfo>(get_key(PRE_TT, token_template_id))
-        .expect("not existed token template");
-    assert!(check_witness(&tt_info.creator));
+    let creator =
+        database::get(get_key(PRE_TT, token_template_id)).expect("not existed token template");
+    assert!(check_witness(&creator));
     true
 }
 
@@ -234,7 +218,7 @@ pub fn authorize_token_template_multi(
     true
 }
 
-fn get_authorized_addr(token_template_id: &[u8]) -> Vec<Address> {
+pub fn get_authorized_addr(token_template_id: &[u8]) -> Vec<Address> {
     let key = get_key(PRE_AUTHORIZED, token_template_id);
     database::get(key.as_slice()).unwrap_or(vec![])
 }
@@ -246,22 +230,17 @@ fn is_valid_addr(acc: &[&Address], token_template_id: &[u8]) -> bool {
         return true;
     }
 
-    let addrs = get_authorized_addr(token_template_id);
-    for addr in addrs.iter() {
-        if acc.contains(&addr) {
-            return true;
-        }
-    }
-
-    false
+    let authed = get_authorized_addr(token_template_id);
+    authed.iter().any(|auth| acc.contains(&auth))
 }
 
-fn get_token_id_by_template_id(token_template_id: &[u8]) -> Vec<u8> {
+pub fn get_token_id_by_template_id(token_template_id: &[u8]) -> Vec<u8> {
     let key = get_key(PRE_TOKEN_ID, token_template_id);
     database::get::<_, Vec<u8>>(key.as_slice()).unwrap_or(vec![])
 }
 
-fn get_template_id_by_token_id(token_id: &[u8]) -> Vec<u8> {
+//todo: need remove
+pub fn get_template_id_by_token_id(token_id: &[u8]) -> Vec<u8> {
     let key = get_key(PRE_TEMPLATE_ID, token_id);
     database::get::<_, Vec<u8>>(key.as_slice()).unwrap_or(vec![])
 }
@@ -299,7 +278,7 @@ pub fn use_token(account: &Address, token_id: &[u8], n: U128) -> bool {
     true
 }
 
-fn delete_token(account: &Address, token_id: &[u8]) -> bool {
+pub fn delete_token(account: &Address, token_id: &[u8]) -> bool {
     assert!(check_witness(account) || check_witness(CONTRACT_COMMON.admin()));
     let template_id = get_template_id_by_token_id(token_id);
     oep8::delete_token(token_id);
@@ -335,8 +314,7 @@ pub fn use_token_by_agent(account: &Address, agent: &Address, token_id: &[u8], n
     let ba = oep8::balance_of(account, token_id);
     assert!(ba >= n);
     let mut sink = Sink::new(64);
-    generate_agent_key(&mut sink, agent, token_id);
-    let agent_count = database::get(sink.bytes()).unwrap_or(0);
+    let agent_count = database::get(generate_agent_key(&mut sink, agent, token_id)).unwrap_or(0);
     assert!(agent_count >= n);
     if agent_count == n {
         database::delete(sink.bytes());
@@ -414,26 +392,23 @@ pub fn set_token_agents_inner(
     let sum = n.iter().sum();
     assert!(ba >= sum);
     let mut sink = Sink::new(64);
-    let l = agents.len();
-    for i in 0..l {
+    for (agent, num) in agents.into_iter().zip(n.iter()) {
         sink.clear();
-        generate_agent_key(&mut sink, agents.get(i).unwrap(), token_id);
-        database::put(sink.bytes(), n.get(i).unwrap());
+        database::put(generate_agent_key(&mut sink, agent, token_id), num);
         EventBuilder::new()
             .string("setTokenAgents")
             .address(account)
             .bytearray(token_id)
-            .address(agents.get(i).unwrap())
-            .number(*n.get(i).unwrap())
+            .address(agent)
+            .number(*num)
             .notify();
     }
     true
 }
 
-fn get_agent_balance(agent: &Address, token_id: &[u8]) -> U128 {
+pub fn get_agent_balance(agent: &Address, token_id: &[u8]) -> U128 {
     let mut sink = Sink::new(64);
-    generate_agent_key(&mut sink, agent, token_id);
-    database::get(sink.bytes()).unwrap_or(0)
+    database::get(generate_agent_key(&mut sink, agent, token_id)).unwrap_or(0)
 }
 
 /// add_agents, this method append agents for the all token
@@ -488,8 +463,7 @@ pub fn add_token_agents_inner(
     let mut sink = Sink::new(64);
     for (agent, &n) in agents.into_iter().zip(n.into_iter()) {
         sink.clear();
-        generate_agent_key(&mut sink, agent, token_id);
-        let ba: u128 = database::get(sink.bytes()).unwrap_or(0);
+        let ba: u128 = database::get(generate_agent_key(&mut sink, agent, token_id)).unwrap_or(0);
         let ba = ba.checked_add(n).unwrap();
         database::put(sink.bytes(), ba);
         EventBuilder::new()
@@ -549,7 +523,7 @@ pub fn remove_token_agents_inner(account: &Address, token_id: &[u8], agents: &[A
     true
 }
 
-fn transfer_dtoken_multi(
+pub fn transfer_dtoken_multi(
     from: &Address,
     to: &Address,
     token_template_ids: &[Vec<u8>],
@@ -563,39 +537,33 @@ fn transfer_dtoken_multi(
     true
 }
 
-fn transfer_dtoken(from: &Address, to: &Address, token_template_id: &[u8], n: U128) -> bool {
+pub fn transfer_dtoken(from: &Address, to: &Address, token_template_id: &[u8], n: U128) -> bool {
     let token_id = get_token_id_by_template_id(token_template_id);
     assert!(oep8::transfer(from, to, token_id.as_slice(), n));
     true
 }
 
-#[no_mangle]
-pub fn invoke() {
-    let input = runtime::input();
-    let mut source = Source::new(&input);
-    let action: &[u8] = source.read().unwrap();
-    let mut sink = Sink::new(12);
+#[cfg(feature = "layer1")]
+pub fn transfer_to_layer2(from: &Address, to: &Address, id: &[u8], amt: u128) -> bool {
+    let l2id = database::get(PRE_LAYER2).expect("layer2 id is not set!");
+    oep8::transfer_to_layer2(from, to, id, amt, l2id)
+}
+
+#[cfg(feature = "layer1")]
+pub fn set_layer2_id(l2id: u128) -> bool {
+    assert!(check_witness(&get_admin()));
+    database::put(PRE_LAYER2, l2id);
+    true
+}
+
+#[cfg(not(feature = "layer1"))]
+fn layer1_action(_action: &[u8], _sink: &mut Sink, _source: &mut Source) -> bool {
+    false
+}
+
+#[cfg(feature = "layer1")]
+fn layer1_action(action: &[u8], sink: &mut Sink, source: &mut Source) -> bool {
     match action {
-        //*********************admin method********************
-        b"updateAdmin" => {
-            let new_admin = source.read().unwrap();
-            sink.write(update_admin(&new_admin));
-        }
-        b"getAdmin" => {
-            sink.write(get_admin());
-        }
-        b"setMpContract" => {
-            let new_addr = source.read().unwrap();
-            sink.write(set_mp_contract(new_addr));
-        }
-        b"getMpContract" => {
-            sink.write(get_mp_contract());
-        }
-        b"migrate" => {
-            let (code, vm_type, name, version, author, email, desc) = source.read().unwrap();
-            sink.write(CONTRACT_COMMON.migrate(code, vm_type, name, version, author, email, desc));
-        }
-        //*********************jwtToken method********************
         b"createTokenTemplate" => {
             let (creator, token_template_bs) = source.read().unwrap();
             sink.write(create_token_template(creator, token_template_bs));
@@ -677,44 +645,6 @@ pub fn invoke() {
             let (account, token_id) = source.read().unwrap();
             sink.write(delete_token(account, token_id));
         }
-        b"getAgentBalance" => {
-            let (agent, token_id) = source.read().unwrap();
-            sink.write(get_agent_balance(agent, token_id));
-        }
-        b"useToken" => {
-            let (account, token_id, n) = source.read().unwrap();
-            sink.write(use_token(account, token_id, n));
-        }
-        b"useTokenByAgent" => {
-            let (account, agent, token_id, n) = source.read().unwrap();
-            sink.write(use_token_by_agent(account, agent, token_id, n));
-        }
-        b"setAgents" => {
-            let (account, agents, n, token_ids) = source.read().unwrap();
-            sink.write(set_agents(account, agents, n, token_ids));
-        }
-        b"setTokenAgents" => {
-            let (account, token_id, agents, n) = source.read().unwrap();
-            sink.write(set_token_agents(account, token_id, agents, n));
-        }
-        b"addAgents" => {
-            let (account, agents, n, token_ids) = source.read().unwrap();
-            sink.write(add_agents(account, agents, n, token_ids));
-        }
-        b"addTokenAgents" => {
-            let (account, token_id, agents, n): (&Address, &[u8], Vec<Address>, Vec<U128>) =
-                source.read().unwrap();
-            sink.write(add_token_agents(account, token_id, agents.as_slice(), n));
-        }
-        b"removeAgents" => {
-            let (account, agents, token_ids) = source.read().unwrap();
-            sink.write(remove_agents(account, agents, token_ids));
-        }
-        b"removeTokenAgents" => {
-            let (account, token_id, agents): (&Address, &[u8], Vec<Address>) =
-                source.read().unwrap();
-            sink.write(remove_token_agents(account, token_id, agents.as_slice()));
-        }
         //**************************mp invoke*************************
         b"transferDTokenMulti" => {
             let (from, to, token_template_ids, n): (&Address, &Address, Vec<Vec<u8>>, U128) =
@@ -730,68 +660,149 @@ pub fn invoke() {
             let (from, to, token_template_ids, n) = source.read().unwrap();
             sink.write(transfer_dtoken(from, to, token_template_ids, n));
         }
-        //************************oep8 method*********************
-        b"transfer" => {
-            let (from, to, token_id, n) = source.read().unwrap();
-            sink.write(oep8::transfer(from, to, token_id, n));
+        b"setLayer2Id" => sink.write(set_layer2_id(source.read().unwrap())),
+        b"transferToLayer2" => {
+            let (from, to, id, amt) = source.read().unwrap();
+            sink.write(transfer_to_layer2(from, to, id, amt));
         }
-        b"transferMulti" => {
-            let param: Vec<TrMulParam> = source.read().unwrap();
-            sink.write(oep8::transfer_multi(param.as_slice()));
-        }
-        b"name" => {
-            let token_id = source.read().unwrap();
-            sink.write(oep8::name(token_id));
-        }
-        b"symbol" => {
-            let token_id = source.read().unwrap();
-            sink.write(oep8::symbol(token_id));
-        }
-        b"totalSupply" => {
-            let token_id = source.read().unwrap();
-            sink.write(oep8::total_supply(token_id));
-        }
-        b"balanceOf" => {
-            let (addr, token_id) = source.read().unwrap();
-            sink.write(oep8::balance_of(addr, token_id));
-        }
-        b"balancesOf" => {
-            let addr = source.read().unwrap();
-            sink.write(oep8::balances_of(addr));
-        }
-        b"approve" => {
-            let (owner, spender, token_id, amt) = source.read().unwrap();
-            sink.write(oep8::approve(owner, spender, token_id, amt));
-        }
-        b"approveMulti" => {
-            let args: Vec<AppMulParam> = source.read().unwrap();
-            sink.write(oep8::approve_multi(args.as_slice()));
-        }
-        b"allowance" => {
-            let (owner, spender, token_id) = source.read().unwrap();
-            sink.write(oep8::allowance(owner, spender, token_id));
-        }
-        b"transferFrom" => {
-            let (spender, from, to, token_id, amt) = source.read().unwrap();
-            sink.write(oep8::transfer_from(spender, from, to, token_id, amt));
-        }
-        b"transferFromMulti" => {
-            let args: Vec<TrFromMulParam> = source.read().unwrap();
-            sink.write(oep8::transfer_from_multi(args.as_slice()));
-        }
-        _ => {
-            let method = str::from_utf8(action).ok().unwrap();
-            panic!("dtoken contract, not support method:{}", method)
+        _ => return false,
+    }
+
+    true
+}
+
+#[no_mangle]
+pub fn invoke() {
+    let input = runtime::input();
+    let mut source = Source::new(&input);
+    let action: &[u8] = source.read().unwrap();
+    let mut sink = Sink::new(12);
+    let handled = layer1_action(action, &mut sink, &mut source);
+
+    if !handled {
+        match action {
+            //*********************admin method********************
+            b"updateAdmin" => {
+                let new_admin = source.read().unwrap();
+                sink.write(update_admin(&new_admin));
+            }
+            b"getAdmin" => {
+                sink.write(get_admin());
+            }
+            b"migrate" => {
+                let (code, vm_type, name, version, author, email, desc) = source.read().unwrap();
+                sink.write(
+                    CONTRACT_COMMON.migrate(code, vm_type, name, version, author, email, desc),
+                );
+            }
+            //*********************jwtToken method********************
+            b"getAgentBalance" => {
+                let (agent, token_id) = source.read().unwrap();
+                sink.write(get_agent_balance(agent, token_id));
+            }
+            b"useToken" => {
+                let (account, token_id, n) = source.read().unwrap();
+                sink.write(use_token(account, token_id, n));
+            }
+            b"useTokenByAgent" => {
+                let (account, agent, token_id, n) = source.read().unwrap();
+                sink.write(use_token_by_agent(account, agent, token_id, n));
+            }
+            b"setAgents" => {
+                let (account, agents, n, token_ids) = source.read().unwrap();
+                sink.write(set_agents(account, agents, n, token_ids));
+            }
+            b"setTokenAgents" => {
+                let (account, token_id, agents, n) = source.read().unwrap();
+                sink.write(set_token_agents(account, token_id, agents, n));
+            }
+            b"addAgents" => {
+                let (account, agents, n, token_ids) = source.read().unwrap();
+                sink.write(add_agents(account, agents, n, token_ids));
+            }
+            b"addTokenAgents" => {
+                let (account, token_id, agents, n): (&Address, &[u8], Vec<Address>, Vec<U128>) =
+                    source.read().unwrap();
+                sink.write(add_token_agents(account, token_id, agents.as_slice(), n));
+            }
+            b"removeAgents" => {
+                let (account, agents, token_ids) = source.read().unwrap();
+                sink.write(remove_agents(account, agents, token_ids));
+            }
+            b"removeTokenAgents" => {
+                let (account, token_id, agents): (&Address, &[u8], Vec<Address>) =
+                    source.read().unwrap();
+                sink.write(remove_token_agents(account, token_id, agents.as_slice()));
+            }
+            //************************oep8 method*********************
+            b"transfer" => {
+                let (from, to, token_id, n) = source.read().unwrap();
+                sink.write(oep8::transfer(from, to, token_id, n));
+            }
+            b"transferMulti" => {
+                let param: Vec<TrMulParam> = source.read().unwrap();
+                sink.write(oep8::transfer_multi(param.as_slice()));
+            }
+            b"name" => {
+                let token_id = source.read().unwrap();
+                sink.write(oep8::name(token_id));
+            }
+            b"symbol" => {
+                let token_id = source.read().unwrap();
+                sink.write(oep8::symbol(token_id));
+            }
+            b"totalSupply" => {
+                let token_id = source.read().unwrap();
+                sink.write(oep8::total_supply(token_id));
+            }
+            b"balanceOf" => {
+                let (addr, token_id) = source.read().unwrap();
+                sink.write(oep8::balance_of(addr, token_id));
+            }
+            b"balancesOf" => {
+                let addr = source.read().unwrap();
+                sink.write(oep8::balances_of(addr));
+            }
+            b"approve" => {
+                let (owner, spender, token_id, amt) = source.read().unwrap();
+                sink.write(oep8::approve(owner, spender, token_id, amt));
+            }
+            b"approveMulti" => {
+                let args: Vec<AppMulParam> = source.read().unwrap();
+                sink.write(oep8::approve_multi(args.as_slice()));
+            }
+            b"allowance" => {
+                let (owner, spender, token_id) = source.read().unwrap();
+                sink.write(oep8::allowance(owner, spender, token_id));
+            }
+            b"transferFrom" => {
+                let (spender, from, to, token_id, amt) = source.read().unwrap();
+                sink.write(oep8::transfer_from(spender, from, to, token_id, amt));
+            }
+            b"transferFromMulti" => {
+                let args: Vec<TrFromMulParam> = source.read().unwrap();
+                sink.write(oep8::transfer_from_multi(args.as_slice()));
+            }
+            _ => {
+                let method = str::from_utf8(action).ok().unwrap();
+                panic!("dtoken contract, not support method:{}", method)
+            }
         }
     }
+
     runtime::ret(sink.bytes());
 }
 
 mod utils {
     use super::*;
-    pub fn generate_agent_key(sink: &mut Sink, agent: &Address, token_id: &[u8]) {
+    pub fn generate_agent_key<'a>(
+        sink: &'a mut Sink,
+        agent: &Address,
+        token_id: &[u8],
+    ) -> &'a [u8] {
         sink.write(PRE_AGENT);
         sink.write(agent);
         sink.write(token_id);
+        sink.bytes()
     }
 }
