@@ -113,7 +113,7 @@ pub fn total_supply(id: &[u8]) -> U128 {
 }
 
 pub fn balance_of(acct: &Address, id: &[u8]) -> U128 {
-    database::get::<_, U128>(gen_balance_key(id, acct.as_ref())).unwrap_or(0)
+    database::get(gen_balance_key(id, acct.as_ref())).unwrap_or(0)
 }
 
 pub fn destroy_token(acct: &Address, id: &[u8], n: U128) {
@@ -169,6 +169,7 @@ pub fn transfer(from: &Address, to: &Address, id: &[u8], amt: u128) -> bool {
     transfer_inner(from, to, id, amt)
 }
 
+#[cfg(feature = "layer1")]
 pub fn transfer_to_layer2(from: &Address, to: &Address, id: &[u8], amt: u128, l2id: u128) -> bool {
     assert!(check_witness(from));
     let from_ba = balance_of(from, id)
@@ -187,6 +188,30 @@ pub fn transfer_to_layer2(from: &Address, to: &Address, id: &[u8], amt: u128, l2
         .bytearray(id)
         .number(amt)
         .notify();
+    true
+}
+
+#[cfg(not(feature = "layer1"))]
+pub fn transfer_from_layer1(
+    from: &Address,
+    to: &Address,
+    id: &[u8],
+    amt: u128,
+    admin: &Address,
+) -> bool {
+    assert!(check_witness(admin));
+    let to_ba = balance_of(to, id)
+        .checked_add(amt)
+        .expect("balance overflow!");
+    database::put(gen_balance_key(id, to.as_ref()), to_ba);
+    EventBuilder::new()
+        .string("transferFromLayer1")
+        .address(from)
+        .address(to)
+        .bytearray(id)
+        .number(amt)
+        .notify();
+
     true
 }
 

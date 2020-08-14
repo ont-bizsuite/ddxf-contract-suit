@@ -47,7 +47,7 @@ pub fn update_admin(new_admin: &Address) -> bool {
 
 /// query admin address
 pub fn get_admin() -> Address {
-    database::get::<_, Address>(KEY_ADMIN).unwrap_or(*CONTRACT_COMMON.admin())
+    database::get(KEY_ADMIN).unwrap_or(*CONTRACT_COMMON.admin())
 }
 
 /// generate dtoken
@@ -557,12 +557,20 @@ pub fn set_layer2_id(l2id: u128) -> bool {
 }
 
 #[cfg(not(feature = "layer1"))]
-fn layer1_action(_action: &[u8], _sink: &mut Sink, _source: &mut Source) -> bool {
-    false
+fn layer_action(action: &[u8], sink: &mut Sink, source: &mut Source) -> bool {
+    match action {
+        b"transferFromLayer1" => {
+            let (from, to, id, amt) = source.read().unwrap();
+            sink.write(oep8::transfer_from_layer1(from, to, id, amt, &get_admin()));
+        }
+        _ => return false,
+    }
+
+    true
 }
 
 #[cfg(feature = "layer1")]
-fn layer1_action(action: &[u8], sink: &mut Sink, source: &mut Source) -> bool {
+fn layer_action(action: &[u8], sink: &mut Sink, source: &mut Source) -> bool {
     match action {
         b"createTokenTemplate" => {
             let (creator, token_template_bs) = source.read().unwrap();
@@ -677,7 +685,7 @@ pub fn invoke() {
     let mut source = Source::new(&input);
     let action: &[u8] = source.read().unwrap();
     let mut sink = Sink::new(12);
-    let handled = layer1_action(action, &mut sink, &mut source);
+    let handled = layer_action(action, &mut sink, &mut source);
 
     if !handled {
         match action {
