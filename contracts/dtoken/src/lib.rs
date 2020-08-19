@@ -61,11 +61,16 @@ pub fn get_admin() -> Address {
 /// `token_template_id` used to mark the only token_template
 ///
 /// `n` represents the number of generate tokens
-pub fn generate_dtoken(acc: &Address, token_template_id: &[u8], n: U128) -> bool {
+pub fn generate_dtoken(acc: &Address, token_template_id: &[u8], n: U128) -> Vec<u8> {
     generate_dtoken_for_other(acc, acc, token_template_id, n)
 }
 
-fn generate_dtoken_inner(acc: &Address, to: &Address, token_template_id: &[u8], n: U128) -> bool {
+fn generate_dtoken_inner(
+    acc: &Address,
+    to: &Address,
+    token_template_id: &[u8],
+    n: U128,
+) -> Vec<u8> {
     let tt = get_token_template(token_template_id).unwrap();
     let token_id =
         oep8::generate_token(tt.token_name.as_slice(), tt.token_symbol.as_slice(), n, to);
@@ -79,7 +84,7 @@ fn generate_dtoken_inner(acc: &Address, to: &Address, token_template_id: &[u8], 
         .number(n)
         .bytearray(token_id.as_slice())
         .notify();
-    true
+    token_id
 }
 
 pub fn generate_dtoken_for_other(
@@ -87,18 +92,22 @@ pub fn generate_dtoken_for_other(
     to: &Address,
     token_template_id: &[u8],
     n: U128,
-) -> bool {
+) -> Vec<u8> {
     let caller = runtime::caller();
     assert!(is_valid_addr(&[&caller, acc], token_template_id));
     assert!(check_witness(acc));
     generate_dtoken_inner(acc, to, token_template_id, n)
 }
 
-pub fn generate_dtoken_multi(acc: &Address, token_template_ids: &[Vec<u8>], n: U128) -> bool {
-    for token_template_id in token_template_ids.iter() {
-        assert!(generate_dtoken(acc, token_template_id, n));
-    }
-    true
+pub fn generate_dtoken_multi(
+    acc: &Address,
+    token_template_ids: &[Vec<u8>],
+    n: U128,
+) -> Vec<Vec<u8>> {
+    token_template_ids
+        .iter()
+        .map(|x| generate_dtoken(acc, x, n))
+        .collect::<Vec<Vec<u8>>>()
 }
 
 pub fn get_token_template(token_template_id: &[u8]) -> Option<TokenTemplate> {
