@@ -1,7 +1,7 @@
 use super::get_dtoken_contract;
 use super::ostd::contract::wasm;
 use super::ostd::prelude::*;
-use super::{verify_result, Address, U128};
+use super::{verify_result, Address, Source, U128};
 use ontio_std::runtime::address;
 
 pub fn verify_creator_sig_multi(dtoken: &Address, token_template_ids: &[Vec<u8>]) -> bool {
@@ -147,38 +147,41 @@ pub fn generate_dtoken(
     token_template_ids: &[Vec<u8>],
     buyer_account: &Address,
     n: U128,
-) {
+) -> Vec<Vec<u8>> {
     if dtokens.len() != 0 {
         let l = dtokens.len();
+        let mut token_ids = Vec::with_capacity(l);
         for i in 0..l {
-            assert!(generate_dtoken_inner(
+            let token_id = generate_dtoken_inner(
                 &dtokens[i],
                 buyer_account,
                 token_template_ids.get(i).unwrap(),
-                n
-            ));
+                n,
+            );
+            token_ids.push(token_id);
         }
+        return token_ids;
     } else {
         let dtoken = get_dtoken_contract();
-        assert!(generate_dtoken_multi(
-            &dtoken,
-            buyer_account,
-            token_template_ids,
-            n
-        ));
+        let token_ids = generate_dtoken_multi(&dtoken, buyer_account, token_template_ids, n);
+        return token_ids;
     }
 }
+
 fn generate_dtoken_inner(
     contract_address: &Address,
     account: &Address,
     token_template_id: &[u8],
     n: U128,
-) -> bool {
-    verify_result(wasm::call_contract(
+) -> Vec<u8> {
+    if let Some(res) = wasm::call_contract(
         contract_address,
         ("generateDToken", (account, token_template_id, n)),
-    ));
-    true
+    ) {
+        let mut source = Source::new(res.as_slice());
+        source.read()
+    }
+    panic!("generateDToken failed")
 }
 
 fn generate_dtoken_multi(
@@ -186,10 +189,13 @@ fn generate_dtoken_multi(
     account: &Address,
     token_template_ids: &[Vec<u8>],
     n: U128,
-) -> bool {
-    verify_result(wasm::call_contract(
+) -> Vec<Vec<u8>> {
+    if let Some(res) = wasm::call_contract(
         contract_address,
         ("generateDTokenMulti", (account, token_template_ids, n)),
-    ));
-    true
+    ) {
+        let mut source = Source::new(res.as_slice());
+        source.read().unwrap()
+    }
+    panic!("generate_dtoken_multi failed")
 }

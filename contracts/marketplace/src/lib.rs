@@ -349,7 +349,12 @@ fn get_token_template_ids(resource_id: &[u8]) -> Vec<Vec<u8>> {
 /// `n` is the number of purchases
 ///
 /// `buyer_account` is buyer address, need this address signature
-pub fn buy_dtoken(resource_id: &[u8], n: U128, buyer_account: &Address, payer: &Address) -> bool {
+pub fn buy_dtoken(
+    resource_id: &[u8],
+    n: U128,
+    buyer_account: &Address,
+    payer: &Address,
+) -> Vec<Vec<u8>> {
     assert!(runtime::check_witness(buyer_account) && runtime::check_witness(payer));
     let mut item_info =
         database::get::<_, SellerItemInfo>(utils::generate_seller_item_info_key(resource_id))
@@ -379,7 +384,7 @@ pub fn buy_dtoken(resource_id: &[u8], n: U128, buyer_account: &Address, payer: &
         &item_info,
     );
     //TODO
-    generate_dtoken(
+    let token_ids = generate_dtoken(
         &item_info.resource_ddo.dtoken_contract_address,
         item_info.item.token_template_ids.as_slice(),
         buyer_account,
@@ -392,7 +397,7 @@ pub fn buy_dtoken(resource_id: &[u8], n: U128, buyer_account: &Address, payer: &
         .address(buyer_account)
         .address(payer)
         .notify();
-    true
+    token_ids
 }
 
 /// buy_dtoken_reward

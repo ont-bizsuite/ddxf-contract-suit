@@ -127,13 +127,15 @@ pub fn create_token_template(creator: &Address, tt: TokenTemplate) -> bool {
 }
 
 pub fn update_token_template(template_id: &[u8], tt: TokenTemplate) -> bool {
-    let creator =
-        database::get(get_key(PRE_TT, template_id)).expect("not existed token template");
+    let creator = database::get(get_key(PRE_TT, template_id)).expect("not existed token template");
     assert!(check_witness(&creator));
-    database::put(get_key(PRE_TT, template_id), TokenTemplateInfo{
-        creator,
-        token_template:tt,
-    });
+    database::put(
+        get_key(PRE_TT, template_id),
+        TokenTemplateInfo {
+            creator,
+            token_template: tt,
+        },
+    );
     EventBuilder::new()
         .string("updateTokenTemplate")
         .bytearray(template_id)
@@ -304,7 +306,8 @@ pub fn use_token_by_agent(account: &Address, agent: &Address, token_id: &[u8], n
     let ba = oep8::balance_of(account, token_id);
     assert!(ba >= n);
     let mut sink = Sink::new(64);
-    let agent_count = database::get(generate_agent_key(&mut sink, agent, token_id)).unwrap_or(0);
+    let agent_count =
+        database::get(generate_agent_key(&mut sink, account, agent, token_id)).unwrap_or(0);
     assert!(agent_count >= n);
     if agent_count == n {
         database::delete(sink.bytes());
@@ -384,7 +387,7 @@ pub fn set_token_agents_inner(
     let mut sink = Sink::new(64);
     for (agent, num) in agents.into_iter().zip(n.iter()) {
         sink.clear();
-        database::put(generate_agent_key(&mut sink, agent, token_id), num);
+        database::put(generate_agent_key(&mut sink, account, agent, token_id), num);
         EventBuilder::new()
             .string("setTokenAgents")
             .address(account)
@@ -396,9 +399,9 @@ pub fn set_token_agents_inner(
     true
 }
 
-pub fn get_agent_balance(agent: &Address, token_id: &[u8]) -> U128 {
+pub fn get_agent_balance(owner: &Address, agent: &Address, token_id: &[u8]) -> U128 {
     let mut sink = Sink::new(64);
-    database::get(generate_agent_key(&mut sink, agent, token_id)).unwrap_or(0)
+    database::get(generate_agent_key(&mut sink, owner, agent, token_id)).unwrap_or(0)
 }
 
 /// add_agents, this method append agents for the all token
@@ -453,7 +456,8 @@ pub fn add_token_agents_inner(
     let mut sink = Sink::new(64);
     for (agent, &n) in agents.into_iter().zip(n.into_iter()) {
         sink.clear();
-        let ba: u128 = database::get(generate_agent_key(&mut sink, agent, token_id)).unwrap_or(0);
+        let ba: u128 =
+            database::get(generate_agent_key(&mut sink, account, agent, token_id)).unwrap_or(0);
         let ba = ba.checked_add(n).unwrap();
         database::put(sink.bytes(), ba);
         EventBuilder::new()
@@ -502,7 +506,7 @@ pub fn remove_token_agents_inner(account: &Address, token_id: &[u8], agents: &[A
     let mut sink = Sink::new(64);
     for agent in agents.iter() {
         sink.clear();
-        generate_agent_key(&mut sink, agent, token_id);
+        generate_agent_key(&mut sink, account, agent, token_id);
         database::delete(sink.bytes());
     }
     EventBuilder::new()
@@ -668,8 +672,8 @@ pub fn invoke() {
             }
             //*********************jwtToken method********************
             b"getAgentBalance" => {
-                let (agent, token_id) = source.read().unwrap();
-                sink.write(get_agent_balance(agent, token_id));
+                let (owner, agent, token_id) = source.read().unwrap();
+                sink.write(get_agent_balance(owner, agent, token_id));
             }
             b"useToken" => {
                 let (account, token_id, n) = source.read().unwrap();
@@ -730,10 +734,6 @@ pub fn invoke() {
                 let (addr, token_id) = source.read().unwrap();
                 sink.write(oep8::balance_of(addr, token_id));
             }
-            b"balancesOf" => {
-                let addr = source.read().unwrap();
-                sink.write(oep8::balances_of(addr));
-            }
             b"approve" => {
                 let (owner, spender, token_id, amt) = source.read().unwrap();
                 sink.write(oep8::approve(owner, spender, token_id, amt));
@@ -768,10 +768,12 @@ mod utils {
     use super::*;
     pub fn generate_agent_key<'a>(
         sink: &'a mut Sink,
+        owner: &Address,
         agent: &Address,
         token_id: &[u8],
     ) -> &'a [u8] {
         sink.write(PRE_AGENT);
+        sink.write(owner);
         sink.write(agent);
         sink.write(token_id);
         sink.bytes()

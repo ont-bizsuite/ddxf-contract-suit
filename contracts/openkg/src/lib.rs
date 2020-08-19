@@ -79,24 +79,14 @@ pub fn buy_use_token(
 ) -> bool {
     //call market place
     let mp = get_mp_contract_addr();
-    verify_result(wasm::call_contract(
-        &mp,
-        ("buyDToken", (resource_id, n, buyer_account, payer)),
-    ));
+    let res = wasm::call_contract(&mp, ("buyDToken", (resource_id, n, buyer_account, payer)));
     //call dtoken
     let dtoken = get_dtoken_contract_addr();
-    let res = wasm::call_contract(&dtoken, ("getTokenIdByTemplateId", (token_template_id,)));
-    if let Some(r) = res {
-        let mut source = Source::new(r.as_slice());
-        let token_id: &[u8] = source.read().unwrap();
-        verify_result(wasm::call_contract(
-            &dtoken,
-            ("useToken", (buyer_account, token_id, n)),
-        ));
-        true
-    } else {
-        false
-    }
+    verify_result(wasm::call_contract(
+        &dtoken,
+        ("useToken", (buyer_account, token_id, n)),
+    ));
+    true
 }
 
 pub fn buy_reward_and_use_token(
@@ -281,6 +271,7 @@ fn invoke() {
             panic!("openkg contract, not support method:{}", method)
         }
     }
+    runtime::ret(sink.bytes());
 }
 
 #[cfg(test)]
