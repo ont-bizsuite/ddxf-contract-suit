@@ -179,7 +179,7 @@ fn generate_dtoken_inner(
         ("generateDToken", (account, token_template_id, n)),
     ) {
         let mut source = Source::new(res.as_slice());
-        source.read()
+        source.read().unwrap()
     }
     panic!("generateDToken failed")
 }
