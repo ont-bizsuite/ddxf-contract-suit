@@ -147,28 +147,20 @@ fn get_admin() -> Address {
 /// ```
 pub fn dtoken_seller_publish(
     resource_id: &[u8],
-    resource_ddo_bytes: &[u8],
-    item_bytes: &[u8],
-    split_policy_param_bytes: &[u8],
+    resource_ddo: ResourceDDO,
+    item: DTokenItem,
+    split_policy_param: &[u8],
 ) -> bool {
-    dtoken_seller_publish_inner(
-        resource_id,
-        resource_ddo_bytes,
-        item_bytes,
-        split_policy_param_bytes,
-        true,
-    )
+    dtoken_seller_publish_inner(resource_id, resource_ddo, item, split_policy_param, true)
 }
 
 pub fn dtoken_seller_publish_inner(
     item_id: &[u8],
-    resource_ddo_bytes: &[u8],
-    item_bytes: &[u8],
+    resource_ddo: ResourceDDO,
+    item: DTokenItem,
     split_policy_param_bytes: &[u8],
     is_publish: bool,
 ) -> bool {
-    let resource_ddo = ResourceDDO::from_bytes(resource_ddo_bytes);
-    let item = DTokenItem::from_bytes(item_bytes);
     let admin = get_admin();
     assert!(runtime::check_witness(&resource_ddo.manager) && runtime::check_witness(&admin));
     let resource =
@@ -208,23 +200,22 @@ pub fn dtoken_seller_publish_inner(
     EventBuilder::new()
         .string(method)
         .bytearray(item_id)
-        .bytearray(resource_ddo_bytes)
-        .bytearray(item_bytes)
-        .bytearray(split_policy_param_bytes)
+        .bytearray(resource_ddo.to_bytes().as_slice())
+        .bytearray(item.to_bytes().as_slice())
         .notify();
     true
 }
 
 pub fn update(
     resource_id: &[u8],
-    resource_ddo_bytes: &[u8],
-    item_bytes: &[u8],
+    resource_ddo: ResourceDDO,
+    item: DTokenItem,
     split_policy_param_bytes: &[u8],
 ) -> bool {
     dtoken_seller_publish_inner(
         resource_id,
-        resource_ddo_bytes,
-        item_bytes,
+        resource_ddo,
+        item,
         split_policy_param_bytes,
         false,
     )

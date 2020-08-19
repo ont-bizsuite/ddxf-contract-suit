@@ -45,9 +45,8 @@ impl RegIdAddAttributesParam {
 ///    }
 /// ```
 ///
-pub fn reg_id_add_attribute_array(reg_id_bytes: Vec<Vec<u8>>) -> bool {
-    for param_bytes in reg_id_bytes.iter() {
-        let reg_id = RegIdAddAttributesParam::from_bytes(param_bytes.as_slice());
+pub fn reg_id_add_attribute_array(reg_id_vec: Vec<RegIdAddAttributesParam>) -> bool {
+    for reg_id in reg_id_vec.iter() {
         assert!(ontid::reg_id_with_controller(
             reg_id.ont_id.as_slice(),
             &reg_id.group,
@@ -60,7 +59,7 @@ pub fn reg_id_add_attribute_array(reg_id_bytes: Vec<Vec<u8>>) -> bool {
         ));
     }
     let mut sink = Sink::new(64);
-    sink.write(reg_id_bytes.as_slice());
+    sink.write(reg_id_vec);
     EventBuilder::new()
         .string("reg_id_add_attribute_array")
         .bytearray(sink.bytes())
@@ -83,7 +82,7 @@ pub fn invoke() {
             sink.write(CONTRACT_COMMON.migrate(code, vm_type, name, version, author, email, desc));
         }
         b"reg_id_add_attribute_array" => {
-            let data_id_bytes: Vec<Vec<u8>> = source.read().unwrap();
+            let data_id_bytes: Vec<RegIdAddAttributesParam> = source.read().unwrap();
             sink.write(reg_id_add_attribute_array(data_id_bytes));
         }
         _ => {
