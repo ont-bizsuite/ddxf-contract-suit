@@ -127,20 +127,6 @@ pub fn destroy_token(acct: &Address, id: &[u8], n: U128) {
     }
 }
 
-pub fn balances_of(acct: &Address) -> Vec<Balance> {
-    let id = get_next_id();
-    let mut res: Vec<Balance> = vec![];
-    for i in 0..id {
-        let id_str = i.to_string();
-        let i_bs = id_str.as_bytes().to_vec();
-        let ba = balance_of(acct, i_bs.as_slice());
-        if ba > 0 {
-            res.push(Balance { id: i_bs, amt: ba });
-        }
-    }
-    res
-}
-
 pub fn generate_token(name: &[u8], symbol: &[u8], supply: U128, admin: &Address) -> Vec<u8> {
     let id = get_next_id();
     let token_id = id.to_string();

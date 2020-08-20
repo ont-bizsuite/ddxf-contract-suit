@@ -16,7 +16,7 @@ use ontio_std::abi::EventBuilder;
 mod test;
 
 #[derive(Encoder, Decoder)]
-struct RegIdAddAttributesParam {
+pub struct RegIdAddAttributesParam {
     ont_id: Vec<u8>,               // data_id
     group: Group,                  // Group contains all controllers's ont_id
     signer: Vec<Signer>, // Signer represents the ontid of the controller contained in the group, need signer's signature
@@ -24,6 +24,7 @@ struct RegIdAddAttributesParam {
 }
 
 impl RegIdAddAttributesParam {
+    #[cfg(test)]
     fn from_bytes(data: &[u8]) -> RegIdAddAttributesParam {
         let mut source = Source::new(data);
         source.read().unwrap()
@@ -45,9 +46,8 @@ impl RegIdAddAttributesParam {
 ///    }
 /// ```
 ///
-pub fn reg_id_add_attribute_array(reg_id_bytes: Vec<Vec<u8>>) -> bool {
-    for param_bytes in reg_id_bytes.iter() {
-        let reg_id = RegIdAddAttributesParam::from_bytes(param_bytes.as_slice());
+pub fn reg_id_add_attribute_array(reg_id_vec: &[RegIdAddAttributesParam]) -> bool {
+    for reg_id in reg_id_vec.iter() {
         assert!(ontid::reg_id_with_controller(
             reg_id.ont_id.as_slice(),
             &reg_id.group,
@@ -60,7 +60,7 @@ pub fn reg_id_add_attribute_array(reg_id_bytes: Vec<Vec<u8>>) -> bool {
         ));
     }
     let mut sink = Sink::new(64);
-    sink.write(reg_id_bytes.as_slice());
+    sink.write(reg_id_vec);
     EventBuilder::new()
         .string("reg_id_add_attribute_array")
         .bytearray(sink.bytes())
@@ -83,8 +83,8 @@ pub fn invoke() {
             sink.write(CONTRACT_COMMON.migrate(code, vm_type, name, version, author, email, desc));
         }
         b"reg_id_add_attribute_array" => {
-            let data_id_bytes: Vec<Vec<u8>> = source.read().unwrap();
-            sink.write(reg_id_add_attribute_array(data_id_bytes));
+            let data_id: Vec<RegIdAddAttributesParam> = source.read().unwrap();
+            sink.write(reg_id_add_attribute_array(data_id.as_slice()));
         }
         _ => {
             let method = str::from_utf8(action).ok().unwrap();
