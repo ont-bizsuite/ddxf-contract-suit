@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["get_balance",""],["get_register_param","query RegisterParam by key"],["invoke",""],["register","register the dividend distribution strategy on the chain"],["transfer",""],["transfer_withdraw",""],["withdraw","the data owner withdraw token from the contract"]],"struct":[["AddrAmt",""],["RegisterParam",""]]});

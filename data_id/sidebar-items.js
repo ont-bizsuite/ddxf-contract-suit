@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["invoke",""],["reg_id_add_attribute_array","register data_id and add_attribute for dataId"]],"struct":[["RegIdAddAttributesParam",""]]});
